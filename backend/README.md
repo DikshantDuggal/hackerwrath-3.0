@@ -268,3 +268,15 @@ The multi-layer scam engine is verified across all core benchmark statements:
 | **Statement D** | *"Your account will be blocked in 5 minutes unless you transfer money."* | `CRITICAL` | 100.0 | ✅ PASS (Coercion + Urgency + Payment) |
 | **Statement E** | *"Hi Mom, I am on my way home, please make dinner."* | `LOW` | 0.0 | ✅ PASS (Benign Family Speech) |
 | **Statement F** | *"Hi Mom, send me the OTP you just received on your phone right now."* | `CRITICAL` | 90.5 | ✅ PASS (Evaluates Request Over Relationship) |
+
+---
+
+## 6. Live Telegram Integration & Real-Time Alerts
+
+The Telegram alert integration is fully operational and verified live:
+- **Bot**: `@EdgingToRunner_bot` (`EdgeRunner_bot`)
+- **End-to-End Delivery**: Confirmed working with live message dispatch (`status: CONNECTED`).
+- **Dynamic Risk Evaluation**: Real-time evaluation across live microphone audio, VoIP call bridge slices, and simulated scam scenarios.
+- **Privacy & Safety**: All OTPs, PINs, bank accounts, and phone numbers are scrubbed using `scrub_sensitive_pii` before alert transmission.
+- **Incident Deduplication**: Prevents alert flooding for ongoing calls while permitting escalation notifications.
+
