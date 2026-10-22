@@ -16,29 +16,34 @@ app/
 │   ├── routes_health.py                 # GET /health
 │   ├── routes_transcription.py          # POST /transcribe
 │   ├── routes_analysis.py               # POST /analyze/transcript, GET/POST /sync/keywords
-│   └── routes_calls.py                  # POST /calls/{call_id}/segments, GET /risk, GET /history, DELETE
+│   ├── routes_calls.py                  # POST /calls/{call_id}/segments, GET /risk, GET /history, DELETE
+│   ├── routes_telegram.py               # GET /telegram/status, GET /telegram/sync, POST /telegram/set-chat-id, POST /telegram/test-alert
+│   └── routes_live_ingest.py            # WS /internal/live/ingest, WS /browser-stream, WS /events, GET /status, POST /spike-simulation
 ├── core/
 │   ├── config.py                        # Environment-driven Settings & configurable weights
 │   ├── logging.py                       # Structured logger with sensitive-data redaction
 │   └── compat.py                        # Native FastAPI/Pydantic loader + stdlib test fallback
 ├── schemas/
-│   ├── transcription.py                 # TranscriptSegment, TranscriptionResponse
+│   ├── transcription.py                 # TimestampedSegment, TranscriptionResponse
 │   ├── analysis.py                      # ContextualAnalysisOutput, RuleEngineResult, ScamRiskAssessment
-│   └── calls.py                         # SegmentSubmissionRequest, CallHistoryResponse, ClearCallResponse
+│   ├── calls.py                         # CallSegmentRequest, CallHistoryResponse, ClearCallResponse
+│   └── telegram.py                      # TelegramSendAlertResponse, TelegramServiceStatus, TelegramCommandResponse
 ├── services/
 │   ├── transcription_service.py         # Pluggable BaseSpeechToTextProvider + SarvamSaarasProvider
 │   ├── rules_engine.py                  # Configurable multilingual rules, negation & duplicate suppression
 │   ├── keyword_sync_service.py          # Cross-call keyword synchronization & readiness verification
-│   ├── contextual_analyzer.py           # Contextual AI Director (Gemini JSON schema + intent analysis)
+│   ├── contextual_analyzer.py           # Contextual AI Director (Sarvam-105B/Gemini JSON schema + intent analysis)
 │   ├── risk_scorer.py                   # Risk fusion (risk_score, p_scam, risk_level, caption, reasons)
 │   ├── alert_service.py                 # Structured alert payload builder
-│   └── conversation_manager.py          # Multi-segment call orchestration & state lifecycle
+│   ├── conversation_manager.py          # Multi-segment call orchestration & state lifecycle
+│   ├── telegram_service.py              # Telegram Bot alert dispatch, PII scrubbing & incident deduplication
+│   └── live_audio_processor.py          # Bounded async queues, non-blocking capture, ~7-8 word chunking & pause flushing
 ├── repositories/
 │   └── conversation_repository.py       # Abstract ConversationRepository + InMemoryConversationRepository (TTL)
 └── detectors/
-    └── deepfake_detector.py             # Pluggable BaseDeepfakeDetector + PlaceholderDeepfakeDetector
+    └── deepfake_detector.py             # Pluggable BaseDeepfakeDetector + HeuristicAcousticDeepfakeDetector
 tests/
-└── test_backend.py                      # Comprehensive automated unit & endpoint test suite
+└── test_backend.py                      # 30 Comprehensive automated unit & endpoint test suites (100% pass)
 ```
 
 ### How the Modules Interact
@@ -239,20 +244,20 @@ curl -s -X POST http://localhost:8000/telegram/alert \
   }' | python3 -m json.tool
 ```
 
-### 11. Telegram VoIP Call Bridge (`/internal/live/*`)
+### 11. Telegram VoIP Call Bridge & Real-Time Audio Streaming (`/internal/live/*`)
 
 ```bash
-# Check live bridge health and supported audio formats (16kHz PCM16LE Mono)
+# Check live bridge readiness and supported audio formats (16kHz PCM16LE Mono)
 curl -s http://localhost:8000/internal/live/status | python3 -m json.tool
 
 # Simulate a live VoIP call bridge spike
-curl -s -X POST http://localhost:8000/internal/live/spike \
-  -H "Content-Type: application/json" \
-  -d '{
-    "caller_name": "Suspicious Caller",
-    "text": "Your account will be blocked in 5 minutes unless you transfer money now."
-  }' | python3 -m json.tool
+curl -s -X POST http://localhost:8000/internal/live/spike-simulation | python3 -m json.tool
 ```
+
+#### Real-Time Audio Streaming WebSockets:
+- **`WS /internal/live/ingest`**: Protocol for `onfloor/apps/telegram-bridge` (py-tgcalls / pyrogram). Accepts binary frames: Byte 0 (channel), Bytes 1-4 (sample offset), Bytes 5+ (16kHz PCM16LE mono).
+- **`WS /internal/live/browser-stream`**: Direct continuous browser microphone streaming for ongoing phone or Telegram calls without restarts. Streams progressive ~7-8 word chunks.
+- **`WS /internal/live/events`**: Real-time HUD dashboard event bus broadcasting live captions, dynamic risk scores, and alert notifications.
 
 ---
 
