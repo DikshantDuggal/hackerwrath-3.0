@@ -32,6 +32,10 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.schemas.calls import CallSegmentRequest
 from app.services.conversation_manager import ConversationManager
+from app.services.live_audio_processor import (
+    LiveAudioSession,
+    get_broadcaster,
+)
 from app.services.telegram_service import TelegramAlertService, get_telegram_service
 from app.services.transcription_service import BaseSpeechToTextProvider
 
@@ -107,7 +111,8 @@ async def websocket_live_ingest(
     settings: Settings = Depends(get_settings),
 ) -> None:
     """
-    WebSocket endpoint ingesting real-time audio from onfloor telegram-bridge.
+    WebSocket endpoint ingesting real-time audio from onfloor telegram-bridge (py-tgcalls).
+    Uses non-blocking bounded queues, concurrent asynchronous transcription, and 7-8 word chunking.
     """
     await websocket.accept()
 
@@ -122,13 +127,17 @@ async def websocket_live_ingest(
     logger.info("Telegram live call audio bridge connected")
 
     call_id: Optional[str] = None
-    customer_pcm_buffer = bytearray()
-    last_process_time = time.time()
-    call_metadata: Dict[str, Any] = {}
+    session: Optional[LiveAudioSession] = None
+    broadcaster = get_broadcaster()
+
+    async def forward_to_bridge_client(event: Dict[str, Any]) -> None:
+        try:
+            await websocket.send_json(event)
+        except Exception:
+            pass
 
     try:
         while True:
-            # Receive text or binary frame
             message = await websocket.receive()
 
             # Handle JSON Control Messages
@@ -143,11 +152,20 @@ async def websocket_live_ingest(
                 if msg_type == "call_started":
                     tg_id = data.get("telegramCallId", f"peer_{uuid.uuid4().hex[:6]}")
                     call_id = f"tg_call_{uuid.uuid4().hex[:8]}"
-                    call_metadata = data.get("customer") or {}
-                    customer_pcm_buffer.clear()
-                    last_process_time = time.time()
 
                     logger.info("Started Telegram call '%s' (tg: %s)", call_id, tg_id)
+
+                    session = LiveAudioSession(
+                        call_id=call_id,
+                        stt_provider=stt_provider,
+                        conversation_manager=manager,
+                        telegram_service=telegram_service,
+                        broadcaster=broadcaster,
+                        language_code="auto",
+                        on_event_callback=forward_to_bridge_client,
+                    )
+                    session.start()
+
                     await websocket.send_json({
                         "type": "ack",
                         "protocolVersion": 1,
@@ -155,87 +173,125 @@ async def websocket_live_ingest(
                     })
 
                 elif msg_type == "call_ended":
-                    if call_id:
+                    if session:
+                        end_summary = await session.stop_and_flush()
                         logger.info("Ended Telegram call '%s'", call_id)
                         await websocket.send_json({
                             "type": "ended",
                             "callId": call_id,
+                            "summary": end_summary,
                         })
+                        session = None
                     break
 
-            # Handle Binary PCM Audio Frames
+            # Handle Binary PCM Audio Frames (16kHz 16-bit Mono)
             elif "bytes" in message and message["bytes"]:
                 raw_bytes = message["bytes"]
                 if len(raw_bytes) < 6:
                     continue
 
-                channel = raw_bytes[0]  # 0 = agent, 1 = customer
-                offset = struct.unpack("<I", raw_bytes[1:5])[0]
+                channel = raw_bytes[0]  # 0 = agent, 1 = customer / potential scammer
                 pcm = raw_bytes[5:]
 
-                # Process customer audio (the remote caller/scammer)
-                if channel == 1 and call_id:
-                    customer_pcm_buffer.extend(pcm)
-
-                    # When buffer reaches ~2.5 seconds (80,000 bytes at 16kHz 16-bit mono)
-                    # or elapsed time > 3 seconds, process segment
-                    now = time.time()
-                    if len(customer_pcm_buffer) >= 64000 or (len(customer_pcm_buffer) >= 32000 and now - last_process_time > 2.5):
-                        chunk_to_process = bytes(customer_pcm_buffer)
-                        customer_pcm_buffer.clear()
-                        last_process_time = now
-
-                        # Convert PCM16 buffer to standard in-memory WAV
-                        wav_io = io.BytesIO()
-                        with wave.open(wav_io, "wb") as wf:
-                            wf.setnchannels(1)
-                            wf.setsampwidth(2)
-                            wf.setframerate(16000)
-                            wf.writeframes(chunk_to_process)
-                        wav_bytes = wav_io.getvalue()
-
-                        try:
-                            # Transcribe with Sarvam Saaras
-                            stt_res = stt_provider.transcribe_bytes(
-                                audio_bytes=wav_bytes,
-                                filename=f"{call_id}_slice.wav",
-                                language_code="auto",
-                            )
-
-                            transcript_text = (stt_res.transcript or "").strip()
-                            if transcript_text:
-                                seg_res = manager.process_segment(
-                                    call_id,
-                                    CallSegmentRequest(
-                                        text=transcript_text,
-                                        speaker="customer",
-                                        language_code=stt_res.language_code,
-                                        start_seconds=0.0,
-                                        end_seconds=stt_res.duration_seconds,
-                                        transcript_confidence=stt_res.confidence,
-                                    ),
-                                )
-
-                                # Send live analysis back over WebSocket
-                                await websocket.send_json({
-                                    "type": "assessment",
-                                    "callId": call_id,
-                                    "transcript": transcript_text,
-                                    "riskLevel": seg_res.assessment.risk_level,
-                                    "riskScore": seg_res.assessment.risk_score,
-                                    "flaggedKeywords": [
-                                        i.keyword_or_pattern for i in seg_res.assessment.rule_analysis.triggered_indicators
-                                    ],
-                                    "recommendedAction": seg_res.assessment.recommended_action,
-                                })
-                        except Exception as exc:
-                            logger.warning("Error processing Telegram audio slice: %s", exc)
+                # Enqueue customer audio non-blockingly
+                if channel == 1 and session:
+                    session.push_pcm_frame(pcm)
 
     except (WebSocketDisconnect, RuntimeError) as disconnect_exc:
         logger.info("Telegram bridge WebSocket disconnected cleanly (%s): %s", call_id, disconnect_exc)
     except Exception as exc:
         logger.error("Telegram bridge error: %s", exc)
+    finally:
+        if session:
+            await session.stop_and_flush()
         try:
             await websocket.close()
         except Exception:
             pass
+
+
+@router.websocket("/browser-stream")
+async def websocket_browser_stream(
+    websocket: WebSocket,
+    manager: ConversationManager = Depends(get_conversation_manager),
+    stt_provider: BaseSpeechToTextProvider = Depends(get_stt_provider),
+    telegram_service: TelegramAlertService = Depends(get_telegram_service),
+) -> None:
+    """
+    Direct WebSocket endpoint for continuous browser-based live audio capture.
+    Allows capturing live ongoing phone calls (e.g., phone on speaker or Telegram desktop audio)
+    directly through the browser microphone without stopping after every sentence.
+    """
+    await websocket.accept()
+    call_id = f"web_live_{uuid.uuid4().hex[:8]}"
+    broadcaster = get_broadcaster()
+    broadcaster.register(websocket)
+
+    async def forward_to_browser(event: Dict[str, Any]) -> None:
+        try:
+            await websocket.send_json(event)
+        except Exception:
+            pass
+
+    session = LiveAudioSession(
+        call_id=call_id,
+        stt_provider=stt_provider,
+        conversation_manager=manager,
+        telegram_service=telegram_service,
+        broadcaster=broadcaster,
+        language_code="auto",
+        on_event_callback=forward_to_browser,
+    )
+    session.start()
+
+    await websocket.send_json({
+        "type": "session_ready",
+        "callId": call_id,
+        "sampleRate": 16000,
+        "chunkTargetWords": 8,
+        "status": "LISTENING_CONTINUOUS",
+    })
+
+    try:
+        while True:
+            msg = await websocket.receive()
+            if "text" in msg and msg["text"]:
+                try:
+                    data = json.loads(msg["text"])
+                    if data.get("type") == "stop":
+                        break
+                    if data.get("type") == "set_language":
+                        session.language_code = data.get("language_code", "auto")
+                except Exception:
+                    continue
+            elif "bytes" in msg and msg["bytes"]:
+                # Browser streams raw PCM16LE audio chunks continuously
+                session.push_pcm_frame(msg["bytes"])
+
+    except (WebSocketDisconnect, RuntimeError):
+        logger.info("Browser audio stream disconnected (%s)", call_id)
+    except Exception as exc:
+        logger.error("Browser stream error: %s", exc)
+    finally:
+        broadcaster.unregister(websocket)
+        await session.stop_and_flush()
+
+
+@router.websocket("/events")
+async def websocket_dashboard_events(
+    websocket: WebSocket,
+) -> None:
+    """
+    HUD broadcast WebSocket for the Suraksha frontend dashboard.
+    Receives all live caption updates, risk score changes, and Telegram notifications in real-time.
+    """
+    await websocket.accept()
+    broadcaster = get_broadcaster()
+    broadcaster.register(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        broadcaster.unregister(websocket)

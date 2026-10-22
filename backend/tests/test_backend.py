@@ -6,9 +6,12 @@ so the test suite runs deterministically with zero paid API calls.
 """
 from __future__ import annotations
 
+import asyncio
+import io
 import json
 import unittest
 import urllib.error
+import wave
 from typing import Any, Dict, List
 
 from app.api.routes_analysis import get_conversation_manager, set_conversation_manager
@@ -21,6 +24,7 @@ from app.main import create_app
 from app.repositories.conversation_repository import InMemoryConversationRepository
 from app.schemas.analysis import TranscriptAnalysisRequest
 from app.schemas.calls import CallSegmentRequest
+from app.schemas.transcription import TranscriptionResponse
 from app.services.contextual_analyzer import (
     ContextualAnalyzer,
     ContextualServiceTimeoutError,
@@ -28,6 +32,12 @@ from app.services.contextual_analyzer import (
 )
 from app.services.conversation_manager import ConversationManager
 from app.services.keyword_sync_service import KeywordSyncService
+from app.services.live_audio_processor import (
+    DashboardBroadcaster,
+    LiveAudioSession,
+    pcm16_to_wav_bytes,
+    split_text_into_word_chunks,
+)
 from app.services.risk_scorer import RiskScorer
 from app.services.rules_engine import RulesEngine
 from app.services.transcription_service import SarvamSaarasProvider
@@ -1053,6 +1063,153 @@ class ScamCallBackendTestSuite(unittest.TestCase):
         self.assertTrue(set_res["ok"])
         self.assertEqual(tg_settings.telegram_chat_id, "888999111")
         self.assertEqual(service.get_status().status, "CONNECTED")
+
+    # -------------------------------------------------------------------------
+    # 29. CONTINUOUS AUDIO PIPELINE AND 7-8 WORD PROGRESSIVE CHUNKING
+    # -------------------------------------------------------------------------
+    def test_29_continuous_audio_session_and_word_chunking(self) -> None:
+        """Verifies PCM16 to WAV conversion, 7-8 word progressive chunking, and backpressure queue handling."""
+        # 1. Test pcm16_to_wav_bytes
+        pcm_sample = b"\x00\x00" * 1600  # 1600 samples = 0.1s at 16kHz
+        wav_data = pcm16_to_wav_bytes(pcm_sample, sample_rate=16000)
+        self.assertTrue(wav_data.startswith(b"RIFF"))
+        self.assertIn(b"WAVE", wav_data)
+
+        with wave.open(io.BytesIO(wav_data), "rb") as wf:
+            self.assertEqual(wf.getnchannels(), 1)
+            self.assertEqual(wf.getsampwidth(), 2)
+            self.assertEqual(wf.getframerate(), 16000)
+            self.assertEqual(wf.getnframes(), 1600)
+
+        # 2. Test split_text_into_word_chunks (targeting 7-8 words)
+        self.assertEqual(split_text_into_word_chunks(""), [])
+        self.assertEqual(split_text_into_word_chunks("Hello world"), ["Hello world"])
+
+        # 17 words -> chunks of 8, 8, 1
+        seventeen_words = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen"
+        chunks = split_text_into_word_chunks(seventeen_words, target_size=8)
+        self.assertEqual(len(chunks), 3)
+        self.assertEqual(len(chunks[0].split()), 8)
+        self.assertEqual(len(chunks[1].split()), 8)
+        self.assertEqual(len(chunks[2].split()), 1)
+
+        # 3. Test LiveAudioSession queue and backpressure
+        class MockSTT:
+            def transcribe_bytes(self, data: bytes, filename: str, lang: str) -> TranscriptionResponse:
+                return TranscriptionResponse(
+                    transcript="test",
+                    language_code="en-IN",
+                    confidence=0.9,
+                    duration_seconds=1.0,
+                )
+
+        broadcaster = DashboardBroadcaster()
+        tg_settings = Settings(telegram_bot_token="", telegram_alerts_enabled=False)
+        tg_service = TelegramAlertService(settings=tg_settings)
+        conv_mgr = ConversationManager(
+            rules_engine=self.rules_engine,
+            contextual_analyzer=self.contextual_analyzer,
+            risk_scorer=RiskScorer(settings=self.settings),
+            repository=InMemoryConversationRepository(),
+        )
+
+        session = LiveAudioSession(
+            call_id="call-bp-test-29",
+            stt_provider=MockSTT(),
+            conversation_manager=conv_mgr,
+            telegram_service=tg_service,
+            broadcaster=broadcaster,
+        )
+
+        # Push frame
+        pushed = session.push_pcm_frame(b"\x00" * 320)
+        self.assertTrue(pushed)
+        self.assertEqual(session.total_packets_received, 1)
+        self.assertEqual(session.total_packets_dropped, 0)
+
+        # Fill queue to capacity (100) and verify backpressure drops oldest without throwing
+        for _ in range(120):
+            session.push_pcm_frame(b"\x00" * 320)
+
+        self.assertGreater(session.total_packets_dropped, 0)
+        self.assertLessEqual(session.queue.qsize(), 100)
+
+    # -------------------------------------------------------------------------
+    # 30. LIVE AUDIO WORKER LOOP, PROGRESSIVE CAPTIONS, AND RISK NOTIFICATION
+    # -------------------------------------------------------------------------
+    def test_30_live_audio_session_async_processing_and_alerts(self) -> None:
+        """Verifies asynchronous audio consumer worker, word chunk emission, and dynamic risk scoring."""
+        async def run_async_test() -> None:
+            class SuspiciousMockSTT:
+                def transcribe_bytes(self, data: bytes, filename: str, lang: str) -> TranscriptionResponse:
+                    return TranscriptionResponse(
+                        transcript="Sir your bank account is blocked please share your OTP immediately to verify",
+                        language_code="en-IN",
+                        confidence=0.95,
+                        duration_seconds=2.0,
+                    )
+
+            events_emitted: List[Dict[str, Any]] = []
+
+            def on_event(payload: Dict[str, Any]) -> None:
+                events_emitted.append(payload)
+
+            def mock_transport(method: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+                return {"ok": True, "result": {"message_id": 9999}}
+
+            broadcaster = DashboardBroadcaster()
+            tg_settings = Settings(
+                telegram_bot_token="test_token_123",
+                telegram_chat_id="7391483991",
+                telegram_alerts_enabled=True,
+            )
+            tg_service = TelegramAlertService(settings=tg_settings, http_transport=mock_transport)
+            conv_mgr = ConversationManager(
+                rules_engine=self.rules_engine,
+                contextual_analyzer=self.contextual_analyzer,
+                risk_scorer=RiskScorer(settings=self.settings),
+                repository=InMemoryConversationRepository(),
+            )
+
+            session = LiveAudioSession(
+                call_id="call-async-test-30",
+                stt_provider=SuspiciousMockSTT(),
+                conversation_manager=conv_mgr,
+                telegram_service=tg_service,
+                broadcaster=broadcaster,
+                on_event_callback=on_event,
+            )
+
+            # Start background worker
+            session.start()
+
+            # Push 48,000 bytes (1.5 seconds) in 10 frames of 4,800 bytes
+            for _ in range(10):
+                session.push_pcm_frame(b"\x00\x01" * 2400)
+                await asyncio.sleep(0.01)
+
+            # Allow consumer loop to detect IDEAL_BUFFER_BYTES and process slice
+            await asyncio.sleep(0.35)
+
+            # Verify caption chunk events were emitted
+            caption_events = [e for e in events_emitted if e.get("type") == "caption_chunk"]
+            self.assertGreater(len(caption_events), 0)
+
+            first_chunk = caption_events[0]
+            self.assertEqual(first_chunk["callId"], "call-async-test-30")
+            self.assertGreaterEqual(first_chunk["riskScore"], 70)
+            self.assertIn(first_chunk["riskLevel"], ("HIGH", "CRITICAL"))
+            self.assertTrue(any("otp" in k.lower() for k in first_chunk["flaggedKeywords"]))
+            # Ensure chunk size is roughly ~7-8 words
+            self.assertLessEqual(first_chunk["wordCount"], 8)
+
+            # Stop and flush
+            close_event = await session.stop_and_flush()
+            self.assertFalse(session.is_active)
+            self.assertEqual(close_event["type"], "call_ended")
+            self.assertEqual(close_event["callId"], "call-async-test-30")
+
+        asyncio.run(run_async_test())
 
 
 if __name__ == "__main__":
