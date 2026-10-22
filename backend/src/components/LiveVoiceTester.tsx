@@ -316,7 +316,7 @@ export default function LiveVoiceTester({
               riskScore: data.riskScore,
               flaggedKeywords: data.flaggedKeywords || [],
               safeAction: data.recommendedAction,
-              source: captureMode === 'dual' && systemStream ? 'dual_capture' : 'microphone',
+              source: data.source || (captureMode === 'dual' && systemStream ? 'dual_capture' : 'microphone'),
             };
 
             setStoredUtterances((prev) => [newUtterance, ...prev]);
@@ -842,7 +842,9 @@ export default function LiveVoiceTester({
                       <span className="w-1.5 h-1.5 rounded-full bg-[var(--green-accent)]" />
                       <span>{new Date(utt.timestamp).toLocaleTimeString()}</span>
                       <span className="text-white/40">·</span>
-                      <span className="uppercase text-[10px] text-white/60">{utt.source}</span>
+                      <span className={`uppercase text-[10px] font-semibold ${utt.speaker === 'agent' ? 'text-emerald-400' : 'text-purple-300'}`}>
+                        {utt.speaker ? `${utt.speaker.toUpperCase()} · ` : ''}{utt.source.replace('_', ' ')}
+                      </span>
                     </span>
 
                     <span
