@@ -5,6 +5,7 @@ Run locally in VS Code / Google Antigravity with:
 """
 from __future__ import annotations
 
+from pathlib import Path
 from app.api.routes_analysis import router as analysis_router
 from app.api.routes_calls import router as calls_router
 from app.api.routes_health import router as health_router
@@ -36,6 +37,16 @@ def create_app() -> FastAPI:
     application.include_router(telegram_router)
     application.include_router(live_ingest_router)
     application.include_router(rag_router)
+
+    # Mount compiled frontend dist if available so http://127.0.0.1:8000 serves the UI directly
+    dist_dir = Path(__file__).resolve().parent.parent / "dist"
+    if dist_dir.exists() and (dist_dir / "index.html").exists():
+        try:
+            from fastapi.staticfiles import StaticFiles
+            application.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="static")
+        except Exception:
+            pass
+
     return application
 
 
