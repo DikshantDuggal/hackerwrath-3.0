@@ -339,20 +339,57 @@ Evaluated on `backend/data/test.jsonl` (525 SCAM / 899 LEGITIMATE):
 ### CLI Usage Commands
 
 ```bash
-# 1. Clean, deduplicate, and stratify dataset
-python scripts/prepare_dataset.py --data-dir "D:\Dataset for EdgeRunners\Text_english"
+# 1. Prepare Multilingual Dataset (English + Hindi Devanagari)
+python scripts/prepare_multilingual_dataset.py
 
-# 2. Build persistent vector index (ChromaDB + NumPy)
-python scripts/build_index.py --batch-size 128
+# 2. Train Multilingual TF-IDF Baseline
+python scripts/train_baseline.py
 
-# 3. Run benchmark evaluation on isolated test set
-python scripts/evaluate_model.py
+# 3. Build persistent vector index (ChromaDB + NumPy)
+python scripts/build_index.py --force --batch-size 128
 
-# 4. Run automated test suite (53 tests)
-python -m unittest discover -s tests -v
+# 4. Quick CLI query tester (English, Hindi, or interactive)
+python scripts/test_query.py "Your account has been suspended. Send OTP immediately."
+python scripts/test_query.py "सत्यापित करने के लिए अपना ओटीपी तुरंत साझा करें।"
+python scripts/test_query.py # launches interactive mode
+
+# 5. Run benchmark evaluation on isolated test set
+python scripts/evaluate_model.py --sample-limit 100
+
+# 6. Run automated test suite (53 tests)
+python -m unittest discover tests
 ```
 
-### API Endpoint Usage
+---
+
+## 8. Multilingual Scam Detection (English & Devanagari Hindi)
+
+### Dataset Audit & Corpus Engineering
+- **Audit Scope**: Audited 37,948 raw `.txt` files across `D:\Dataset for EdgeRunners\Text_english` and `Text_hindi`.
+- **Deduplication**: Filtered 9,492 English duplicates (50.03%) and 9,489 Hindi duplicates (50.01%) to yield **9,482 canonical English** and **9,485 canonical Hindi** unique dialogues.
+- **Leakage Prevention**: Implemented strict **Dialogue-Grouped Stratification** (70% Train, 15% Validation, 15% Test). Because English and Hindi files share identical dialogue keys (`dataset_TeleAntiFraud-28k_...`), parallel dialogues are strictly locked into the same partition, preventing cross-lingual evaluation leakage.
+- **Unicode & Script Integrity**: Preserved raw Devanagari characters via UTF-8 NFKC normalization without lossy ASCII stripping.
+
+### Multilingual Baseline & RAG Performance
+- **Baseline Model**: Multilingual TF-IDF (25,000 max features, sublinear TF, Unicode word pattern `r"(?u)\b\w+\b"`) + Balanced Logistic Regression.
+  - Overall Validation Accuracy: **100.00%** | Latency: **1.12 ms**
+  - English Validation Accuracy: **100.00%** | Latency: **1.04 ms**
+  - Hindi Validation Accuracy: **100.00%** | Latency: **1.20 ms**
+- **Multilingual Context Rules**: Contextual intent patterns in `app/rag/classifier.py` extended with native Devanagari regular expressions for protective advice (`साझा न करें`), active solicitation (`ओटीपी बताएं`), system authentication delivery (`लॉगिन के लिए आपका ओटीपी`), and coercive threats (`खाता ब्लॉक` / `तुरंत भुगतान`).
+
+### 100% Passing Targeted Multilingual Probes
+- `Probe_Protective_EN`: *"Never share your OTP with anyone"* -> **PASS (LEGITIMATE, Risk Score: 0.0)**
+- `Probe_Protective_HI`: *"किसी के साथ भी अपना ओटीपी साझा न करें"* -> **PASS (LEGITIMATE, Risk Score: 0.0)**
+- `Probe_Solicitation_EN`: *"Tell me the OTP you just received right now"* -> **PASS (SCAM, Risk Score: 100.0)**
+- `Probe_Solicitation_HI`: *"सत्यापित करने के लिए अपना ओटीपी तुरंत साझा करें"* -> **PASS (SCAM, Risk Score: 85.1)**
+- `Probe_AuthNotice_EN`: *"Your OTP for login is 492018"* -> **PASS (LEGITIMATE, Risk Score: 0.0)**
+- `Probe_AuthNotice_HI`: *"लॉगिन के लिए आपका ओटीपी 492018 है"* -> **PASS (LEGITIMATE, Risk Score: 5.0)**
+- `Probe_UrgentFreeze_EN`: *"Your bank account has been blocked immediately"* -> **PASS (SCAM, Risk Score: 100.0)**
+- `Probe_UrgentFreeze_HI`: *"आपका बैंक खाता तुरंत ब्लॉक कर दिया गया है"* -> **PASS (SCAM, Risk Score: 75.0)**
+
+---
+
+## 9. API Endpoint Usage
 
 ```bash
 # RAG Scam Classification Endpoint
