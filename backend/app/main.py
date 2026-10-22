@@ -8,6 +8,7 @@ from __future__ import annotations
 from app.api.routes_analysis import router as analysis_router
 from app.api.routes_calls import router as calls_router
 from app.api.routes_health import router as health_router
+from app.api.routes_telegram import router as telegram_router
 from app.api.routes_transcription import router as transcription_router
 from app.core.compat import FastAPI
 from app.core.config import get_settings
@@ -21,7 +22,8 @@ def create_app() -> FastAPI:
         description=(
             "Backend-only AI-powered multilingual scam-call detection system "
             "combining Sarvam AI Saaras STT, negation-aware Rule-Based Engine, "
-            "Contextual AI Director, Cross-Call Keyword Synchronization, and Calibrated Risk Scoring."
+            "Contextual AI Director, Cross-Call Keyword Synchronization, "
+            "Optional Telegram Alerts, and Calibrated Risk Scoring."
         ),
     )
 
@@ -29,6 +31,7 @@ def create_app() -> FastAPI:
     application.include_router(transcription_router)
     application.include_router(analysis_router)
     application.include_router(calls_router)
+    application.include_router(telegram_router)
     return application
 
 

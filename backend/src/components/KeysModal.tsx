@@ -19,6 +19,13 @@ SARVAM_API_KEY="sk_ccuk587o_oSe0neRNm8GhXzTotbDMvQRV"
 SARVAM_BASE_URL="https://api.sarvam.ai"
 SARVAM_STT_MODEL="saaras:v3"
 
+# Optional Telegram Bot Protective Alerts
+TELEGRAM_BOT_TOKEN="your_telegram_bot_token_here"
+TELEGRAM_CHAT_ID="your_telegram_chat_id_here"
+TELEGRAM_ALERTS_ENABLED="true"
+TELEGRAM_ALERT_THRESHOLD="HIGH"
+TELEGRAM_AUTHORIZED_USERS=""
+
 # Twilio Ingestion (Phase 2 - Telephony)
 # TWILIO_ACCOUNT_SID="your_sid_here"
 # TWILIO_AUTH_TOKEN="your_token_here"
@@ -132,6 +139,22 @@ SARVAM_STT_MODEL="saaras:v3"
             </div>
             <p className="text-xs text-[var(--text-secondary)]">
               Runs built-in multilingual semantic intent evaluation and negation suppression offline or via optional Gemini API key.
+            </p>
+          </div>
+
+          {/* 4. Telegram Bot Alerts (Optional) */}
+          <div className="glass p-4 rounded-xl border-purple-500/20 bg-purple-950/10">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-[var(--purple-bright)]" />
+                <span className="text-sm font-semibold text-white">TELEGRAM BOT ALERTS</span>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                OPTIONAL
+              </span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Sends instant protective emergency alerts to your Telegram chat when HIGH/CRITICAL scams are detected. Full PII & credential scrubbing is guaranteed.
             </p>
           </div>
         </div>

@@ -161,6 +161,33 @@ class Settings:
         default_factory=lambda: dict(DEFAULT_RULE_WEIGHTS)
     )
 
+    # Telegram Bot Integration (Optional protective alert notifications)
+    telegram_bot_token: str = field(
+        default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    )
+    telegram_chat_id: str = field(
+        default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    )
+    telegram_alerts_enabled: bool = field(
+        default_factory=lambda: _env_bool("TELEGRAM_ALERTS_ENABLED", True)
+    )
+    telegram_alert_threshold: str = field(
+        default_factory=lambda: os.getenv("TELEGRAM_ALERT_THRESHOLD", "HIGH").strip().upper()
+    )
+    telegram_authorized_users: List[str] = field(
+        default_factory=lambda: [
+            u.strip()
+            for u in os.getenv("TELEGRAM_AUTHORIZED_USERS", "").split(",")
+            if u.strip()
+        ]
+    )
+    telegram_webhook_secret: str = field(
+        default_factory=lambda: os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    )
+    telegram_timeout_seconds: float = field(
+        default_factory=lambda: _env_float("TELEGRAM_TIMEOUT_SECONDS", 4.0)
+    )
+
     @property
     def max_audio_bytes(self) -> int:
         return int(self.max_audio_file_size_mb * 1024 * 1024)
@@ -175,6 +202,17 @@ class Settings:
                 "SARVAM_API_KEY_PLACEHOLDER",
                 "MY_SARVAM_API_KEY",
             )
+        )
+
+    @property
+    def has_live_telegram_credentials(self) -> bool:
+        token = (self.telegram_bot_token or "").strip()
+        chat_id = (self.telegram_chat_id or "").strip()
+        return bool(
+            token
+            and chat_id
+            and token not in ("YOUR_TELEGRAM_BOT_TOKEN_HERE", "PLACEHOLDER")
+            and chat_id not in ("YOUR_CHAT_ID_HERE", "0")
         )
 
 

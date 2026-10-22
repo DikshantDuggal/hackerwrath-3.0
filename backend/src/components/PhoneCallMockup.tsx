@@ -234,7 +234,16 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk }: PhoneC
       </div>
 
       {/* Phone Mockup Screen (Right) */}
-      <div className="lg:col-span-7 flex justify-center">
+      <div className="lg:col-span-7 flex flex-col items-center">
+        {/* Prominent Platform & Telephony Limitation Disclaimer */}
+        <div className="w-full max-w-[370px] mb-3 px-3.5 py-2.5 rounded-xl glass border-amber-500/30 bg-amber-950/20 text-[11px] text-amber-200/90 leading-tight flex items-start gap-2 shadow-sm">
+          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold text-white block mb-0.5">Carrier GSM Control Notice:</span>
+            Web applications and Telegram bots cannot disconnect or mute carrier cellular calls. If you suspect fraud, immediately disconnect via your phone's native dialer.
+          </div>
+        </div>
+
         <div
           className={`
             relative w-full max-w-[340px] sm:max-w-[370px] rounded-[44px] p-4

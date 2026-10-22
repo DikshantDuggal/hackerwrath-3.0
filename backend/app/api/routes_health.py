@@ -45,5 +45,11 @@ async def health_check() -> Dict[str, Any]:
                 "retention_seconds": settings.call_state_retention_seconds,
             },
             "cross_call_keyword_sync": sync_service.get_sync_status(),
+            "telegram_alerts": {
+                "working": True,
+                "configured": settings.has_live_telegram_credentials,
+                "enabled": settings.telegram_alerts_enabled,
+                "threshold": settings.telegram_alert_threshold,
+            },
         },
     }

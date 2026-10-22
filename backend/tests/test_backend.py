@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import json
 import unittest
-from typing import Dict, List
+import urllib.error
+from typing import Any, Dict, List
 
 from app.api.routes_analysis import get_conversation_manager, set_conversation_manager
 from app.api.routes_transcription import get_stt_provider
+from app.services.telegram_service import TelegramAlertService, scrub_sensitive_pii, set_telegram_service
 from app.core.compat import LocalTestClient
 from app.core.config import Settings
 from app.detectors.deepfake_detector import HeuristicAcousticDeepfakeDetector
@@ -642,6 +644,211 @@ class ScamCallBackendTestSuite(unittest.TestCase):
         out = analyzer.analyze("Some text here")
         self.assertEqual(out.service_status, "MALFORMED_OUTPUT")
         self.assertEqual(out.intent_risk_score, 0.0)
+
+    # -------------------------------------------------------------------------
+    # 18. TELEGRAM ALERT DELIVERY & THRESHOLDING
+    # -------------------------------------------------------------------------
+    def test_18_telegram_alert_delivery_and_thresholding(self) -> None:
+        """Verifies Telegram alerts are dispatched on HIGH/CRITICAL and suppressed on LOW/UNKNOWN."""
+        sent_messages: List[Dict[str, Any]] = []
+
+        def mock_tg_transport(method: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            sent_messages.append({"method": method, "payload": payload})
+            return {"ok": True, "result": {"message_id": 9901}}
+
+        tg_settings = Settings(
+            sarvam_api_key="",
+            telegram_bot_token="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+            telegram_chat_id="-100987654321",
+            telegram_alerts_enabled=True,
+            telegram_alert_threshold="HIGH",
+        )
+        tg_service = TelegramAlertService(settings=tg_settings, http_transport=mock_tg_transport)
+
+        # 1. Low risk call should NOT trigger Telegram alert
+        low_assessment = self.manager.analyze_standalone_transcript(
+            TranscriptAnalysisRequest(transcript="Hello, I want to check my account balance.")
+        )
+        res_low = tg_service.send_risk_alert(low_assessment, "call_safe_101")
+        self.assertFalse(res_low.delivered)
+        self.assertEqual(len(sent_messages), 0)
+
+        # 2. Critical/High risk call SHOULD trigger Telegram alert
+        crit_assessment = self.manager.analyze_standalone_transcript(
+            TranscriptAnalysisRequest(
+                transcript="Your account is locked right now. Share the OTP and tell me your PIN immediately!"
+            )
+        )
+        res_crit = tg_service.send_risk_alert(crit_assessment, "call_scam_202")
+        self.assertTrue(res_crit.delivered)
+        self.assertEqual(res_crit.message_id, 9901)
+        self.assertEqual(len(sent_messages), 1)
+
+        sent_text = sent_messages[0]["payload"]["text"]
+        self.assertIn("SURAKSHA AI SCAM SHIELD", sent_text)
+        self.assertIn("call_scam_202", sent_text)
+        self.assertIn("Telephony Limitation Warning", sent_text)
+
+    # -------------------------------------------------------------------------
+    # 19. TELEGRAM INCIDENT DEDUPLICATION
+    # -------------------------------------------------------------------------
+    def test_19_telegram_incident_deduplication(self) -> None:
+        """Verifies alerts are not repeated for the same ongoing call incident unless escalated."""
+        sent_messages: List[Dict[str, Any]] = []
+
+        def mock_tg_transport(method: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            sent_messages.append({"method": method, "payload": payload})
+            return {"ok": True, "result": {"message_id": len(sent_messages)}}
+
+        tg_settings = Settings(
+            sarvam_api_key="",
+            telegram_bot_token="valid_token",
+            telegram_chat_id="12345",
+            telegram_alerts_enabled=True,
+            telegram_alert_threshold="HIGH",
+        )
+        tg_service = TelegramAlertService(settings=tg_settings, http_transport=mock_tg_transport)
+
+        # Initial high risk alert
+        crit_assessment = self.manager.analyze_standalone_transcript(
+            TranscriptAnalysisRequest(transcript="Download AnyDesk and share your screen.")
+        )
+        first_send = tg_service.send_risk_alert(crit_assessment, "incident_call_303")
+        self.assertTrue(first_send.delivered)
+        self.assertEqual(len(sent_messages), 1)
+
+        # Immediate repeated segment for same incident -> MUST be suppressed
+        second_send = tg_service.send_risk_alert(crit_assessment, "incident_call_303")
+        self.assertFalse(second_send.delivered)
+        self.assertIn("Duplicate incident alert suppressed", second_send.detail)
+        self.assertEqual(len(sent_messages), 1)
+
+    # -------------------------------------------------------------------------
+    # 20. TELEGRAM PII & CREDENTIAL SCRUBBING
+    # -------------------------------------------------------------------------
+    def test_20_telegram_pii_and_credential_scrubbing(self) -> None:
+        """Verifies OTPs, PINs, passwords, and phone numbers are scrubbed from messages."""
+        sensitive_text = "Caller asked to share OTP 849201 and password: SecretPass123 for phone +91 9876543210"
+        scrubbed = scrub_sensitive_pii(sensitive_text)
+        self.assertNotIn("849201", scrubbed)
+        self.assertNotIn("SecretPass123", scrubbed)
+        self.assertNotIn("9876543210", scrubbed)
+        self.assertIn("[REDACTED_CODE]", scrubbed)
+        self.assertIn("[REDACTED]", scrubbed)
+
+    # -------------------------------------------------------------------------
+    # 21. TELEGRAM OPTIONAL INTEGRATION & MISSING CREDENTIALS
+    # -------------------------------------------------------------------------
+    def test_21_telegram_missing_credentials_optional_fallback(self) -> None:
+        """Verifies system works completely normally when Telegram bot token is omitted."""
+        tg_empty = TelegramAlertService(settings=Settings(telegram_bot_token="", telegram_chat_id=""))
+        status = tg_empty.get_status()
+        self.assertFalse(status.configured)
+        self.assertFalse(status.enabled)
+        self.assertEqual(status.status, "NOT_CONFIGURED")
+
+        # Disallow dispatch without throwing exceptions
+        mock_assess = self.manager.analyze_standalone_transcript(
+            TranscriptAnalysisRequest(transcript="Critical arrest warrant scam")
+        )
+        res = tg_empty.send_risk_alert(mock_assess, "call_unconfigured_404")
+        self.assertFalse(res.delivered)
+        self.assertEqual(res.status, "NOT_CONFIGURED")
+
+    # -------------------------------------------------------------------------
+    # 22. TELEGRAM WEBHOOK AUTHORIZATION & COMMANDS
+    # -------------------------------------------------------------------------
+    def test_22_telegram_webhook_authorization_and_commands(self) -> None:
+        """Verifies webhook validates sender authorization and executes bot commands."""
+        tg_settings = Settings(
+            telegram_bot_token="test_token",
+            telegram_chat_id="999000",
+            telegram_authorized_users=["999000", "888111"],
+        )
+        tg_service = TelegramAlertService(settings=tg_settings)
+
+        # 1. Authorized user sends /status
+        auth_update = {
+            "update_id": 1,
+            "message": {
+                "message_id": 10,
+                "from": {"id": 999000, "first_name": "Admin"},
+                "chat": {"id": 999000, "type": "private"},
+                "text": "/status",
+            },
+        }
+        res_auth = tg_service.handle_webhook_update(auth_update)
+        self.assertTrue(res_auth.handled)
+        self.assertTrue(res_auth.authorized)
+        self.assertIn("Suraksha System Status", res_auth.reply_text or "")
+
+        # 2. Unauthorized user sends /status
+        unauth_update = {
+            "update_id": 2,
+            "message": {
+                "message_id": 11,
+                "from": {"id": 777333, "first_name": "Stranger"},
+                "chat": {"id": 777333, "type": "private"},
+                "text": "/status",
+            },
+        }
+        res_unauth = tg_service.handle_webhook_update(unauth_update)
+        self.assertFalse(res_unauth.handled)
+        self.assertFalse(res_unauth.authorized)
+        self.assertIn("Access Denied", res_unauth.reply_text or "")
+
+        # 3. Mute / Unmute commands
+        mute_res = tg_service.handle_webhook_update({
+            "update_id": 3,
+            "message": {"message_id": 12, "from": {"id": 999000}, "chat": {"id": 999000}, "text": "/mute"}
+        })
+        self.assertTrue(mute_res.handled)
+        self.assertFalse(tg_service.is_enabled)
+
+        unmute_res = tg_service.handle_webhook_update({
+            "update_id": 4,
+            "message": {"message_id": 13, "from": {"id": 999000}, "chat": {"id": 999000}, "text": "/unmute"}
+        })
+        self.assertTrue(unmute_res.handled)
+        self.assertTrue(tg_service.is_enabled)
+
+    # -------------------------------------------------------------------------
+    # 23. TELEGRAM DELIVERY FAILURE HANDLING & API ROUTE
+    # -------------------------------------------------------------------------
+    def test_23_telegram_delivery_failure_and_error_reporting(self) -> None:
+        """Verifies delivery errors are reported gracefully without crashing."""
+        def failing_transport(_method: str, _payload: Dict[str, Any]) -> Dict[str, Any]:
+            raise urllib.error.HTTPError(
+                url="https://api.telegram.org",
+                code=401,
+                msg="Unauthorized: invalid bot token",
+                hdrs={},
+                fp=None,
+            )
+
+        tg_service = TelegramAlertService(
+            settings=Settings(telegram_bot_token="bad_token", telegram_chat_id="12345"),
+            http_transport=failing_transport,
+        )
+        set_telegram_service(tg_service)
+
+        status_resp = self.client.get("/telegram/status")
+        self.assertEqual(status_resp.status_code, 200)
+        self.assertTrue(status_resp.json()["configured"])
+
+        manual_alert_resp = self.client.post(
+            "/telegram/alert",
+            json={
+                "call_id": "test_failure_call",
+                "risk_level": "CRITICAL",
+                "risk_score": 90.0,
+                "headline": "Test Scam Alert",
+                "safe_action": "Hang up",
+            },
+        )
+        self.assertEqual(manual_alert_resp.status_code, 200)
+        self.assertFalse(manual_alert_resp.json()["delivered"])
+        self.assertEqual(manual_alert_resp.json()["status"], "UNAUTHORIZED")
 
 
 if __name__ == "__main__":

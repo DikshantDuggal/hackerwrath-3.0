@@ -30,6 +30,7 @@ from app.services.contextual_analyzer import ContextualAnalyzer
 from app.services.keyword_sync_service import KeywordSyncService, get_keyword_sync_service
 from app.services.risk_scorer import RiskScorer
 from app.services.rules_engine import RulesEngine
+from app.services.telegram_service import TelegramAlertService, get_telegram_service
 
 logger = get_logger("scam_detector.conversation_manager")
 
@@ -44,6 +45,7 @@ class ConversationManager:
         contextual_analyzer: Optional[ContextualAnalyzer] = None,
         risk_scorer: Optional[RiskScorer] = None,
         keyword_sync_service: Optional[KeywordSyncService] = None,
+        telegram_service: Optional[TelegramAlertService] = None,
         settings: Optional[Settings] = None,
     ) -> None:
         self.settings = settings or get_settings()
@@ -56,6 +58,7 @@ class ConversationManager:
             settings=self.settings
         )
         self.risk_scorer = risk_scorer or RiskScorer(settings=self.settings)
+        self.telegram_service = telegram_service or get_telegram_service()
 
     def analyze_standalone_transcript(
         self, request: TranscriptAnalysisRequest
@@ -70,7 +73,7 @@ class ConversationManager:
         ctx_res = self.contextual_analyzer.analyze(
             request.transcript, conversation_history=request.conversation_history
         )
-        return self.risk_scorer.score(
+        assessment = self.risk_scorer.score(
             rule_result=rule_res,
             contextual_result=ctx_res,
             transcript_confidence=request.transcript_confidence,
@@ -78,6 +81,12 @@ class ConversationManager:
             end_seconds=request.end_seconds,
             sync_status=self.keyword_sync.get_sync_status(),
         )
+        if request.call_id and self.telegram_service.is_enabled:
+            try:
+                self.telegram_service.send_risk_alert(assessment, request.call_id)
+            except Exception as exc:
+                logger.warning("Telegram notification dispatch error: %s", exc)
+        return assessment
 
     def process_segment(
         self, call_id: str, segment: CallSegmentRequest
@@ -191,6 +200,13 @@ class ConversationManager:
 
         state.latest_assessment = assessment
         self.repository.save(state)
+
+        # Dispatch Telegram notification if enabled and risk threshold reached
+        if self.telegram_service.is_enabled:
+            try:
+                self.telegram_service.send_risk_alert(assessment, call_id)
+            except Exception as exc:
+                logger.warning("Telegram notification dispatch error: %s", exc)
 
         return CallSegmentUpdateResponse(
             call_id=call_id,

@@ -139,10 +139,10 @@ export default function App() {
       />
 
       {/* Atmospheric gradient mesh */}
-      <div className="bg-mesh" />
+      <div className="bg-mesh pointer-events-none" />
 
       {/* Content Layer */}
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="relative z-20 flex flex-col min-h-screen">
         {/* Navigation Bar */}
         <header className="glass border-b border-[var(--glass-border)] px-4 sm:px-6 py-3.5 sticky top-0 z-30 shadow-md">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
@@ -284,15 +284,16 @@ export default function App() {
           </div>
         </header>
 
-        {/* Global Threat Alert Bar if HIGH RISK detected */}
-        {riskLevel === 'HIGH' && (
-          <div className="bg-red-950/80 border-b border-red-500/50 py-2.5 px-4 backdrop-blur-md animate-pulse">
+        {/* Global Threat Alert Bar if HIGH or CRITICAL RISK detected */}
+        {(riskLevel === 'HIGH' || riskLevel === 'CRITICAL') && (
+          <div className={`${riskLevel === 'CRITICAL' ? 'bg-rose-950/90 border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.3)]' : 'bg-red-950/80 border-red-500/50'} border-b py-2.5 px-4 backdrop-blur-md animate-pulse`}>
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 text-xs">
-              <div className="flex items-center gap-2 text-red-200 font-semibold">
-                <Flame className="w-4 h-4 text-red-400 animate-bounce flex-shrink-0" />
+              <div className="flex items-center gap-2 text-red-100 font-semibold">
+                <Flame className="w-4 h-4 text-rose-400 animate-bounce flex-shrink-0" />
                 <span>
-                  CRITICAL FRAUD ALERT: High probability scam detected in caller speech! Never enter
-                  your UPI PIN or share OTP.
+                  {riskLevel === 'CRITICAL'
+                    ? 'EMERGENCY SCAM INTERCEPT: Active extortion or OTP theft pattern identified! Do not comply or disclose details.'
+                    : 'HIGH FRAUD ALERT: High probability scam detected in caller speech! Never enter your UPI PIN or share OTP.'}
                 </span>
               </div>
               <button
