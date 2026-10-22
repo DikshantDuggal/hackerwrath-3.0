@@ -1,0 +1,26 @@
+# Secrets and local config
+.env
+backend/.env
+android/local.properties
+android/app/google-services.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+*.iml
+.DS_Store
+
+# Never commit call recordings or transcripts
+*.wav
+!backend/scenarios/clips/.keep
+
+# Node
+node_modules/
