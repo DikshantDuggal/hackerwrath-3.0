@@ -18,6 +18,7 @@ async def health_check() -> Dict[str, Any]:
         "working": True,
         "service": settings.app_name,
         "version": settings.app_version,
+        "sarvam_configured": settings.has_live_sarvam_key,
         "modules": {
             "speech_to_text": {
                 "working": True,

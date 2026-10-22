@@ -2,26 +2,32 @@ import express from 'express';
 import http from 'http';
 import { spawn, ChildProcess } from 'child_process';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
-const PORT = 3000;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PORT = Number(process.env.PORT || 3000);
 const PYTHON_PORT = Number(process.env.PYTHON_BACKEND_PORT || 8000);
+const isDev = process.env.NODE_ENV !== 'production';
 
 let pythonProc: ChildProcess | null = null;
 
 function startPythonBackend(): void {
-  pythonProc = spawn('python3', ['-m', 'app.asgi_stdlib_runner'], {
+  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  pythonProc = spawn(pythonCmd, ['-m', 'app.asgi_stdlib_runner'], {
     env: {
       ...process.env,
       PYTHON_BACKEND_PORT: String(PYTHON_PORT),
     },
     stdio: 'inherit',
+    cwd: __dirname,
   });
 
   pythonProc.on('exit', (code) => {
-    console.error(`Python FastAPI backend exited with code ${code}; restarting in 1s...`);
-    setTimeout(startPythonBackend, 1000);
+    console.error(`Python FastAPI backend exited with code ${code}; restarting in 2s...`);
+    setTimeout(startPythonBackend, 2000);
   });
 }
 
@@ -61,32 +67,31 @@ async function startServer(): Promise<void> {
 
   const app = express();
 
-  // Forward all backend API routes directly to the Python FastAPI service (raw stream for multipart/JSON)
+  // Forward all backend API routes to the Python FastAPI service
   app.use(['/health', '/transcribe', '/analyze', '/calls', '/sync'], (req, res) => {
     proxyToPython(req, res);
   });
 
-  // Root endpoint returns backend-only API directory JSON (zero UI/HTML dashboard)
-  app.get('/', (_req, res) => {
-    res.json({
-      service: 'AI-Powered Scam-Call Detection Backend (Python FastAPI)',
-      mode: 'backend-only',
-      endpoints: [
-        'GET /health',
-        'POST /transcribe',
-        'POST /analyze/transcript',
-        'POST /calls/{call_id}/segments',
-        'GET /calls/{call_id}/risk',
-        'GET /calls/{call_id}/history',
-        'DELETE /calls/{call_id}',
-        'GET /sync/keywords',
-        'POST /sync/keywords',
-      ],
+  if (isDev) {
+    // In dev, Vite handles the frontend via its own dev server
+    const { createServer } = await import('vite');
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
     });
-  });
+    app.use(vite.middlewares);
+  } else {
+    // In production, serve the built frontend
+    app.use(express.static(path.join(__dirname, 'dist')));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    });
+  }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Backend gateway listening on http://localhost:${PORT} -> Python FastAPI on 127.0.0.1:${PYTHON_PORT}`);
+    console.log(`\n🛡️  SURAKSHA MVP running on http://localhost:${PORT}`);
+    console.log(`   Python FastAPI backend on 127.0.0.1:${PYTHON_PORT}`);
+    console.log(`   Mode: ${isDev ? 'development' : 'production'}\n`);
   });
 }
 

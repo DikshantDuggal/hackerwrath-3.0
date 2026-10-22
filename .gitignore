@@ -16,3 +16,7 @@ local.properties
 *.aab
 .idea/
 .DS_Store
+KEYS_GUIDE.txt
+KEYS_CONFIGURATION.txt
+KEYS_REQUIRED.txt
+node_modules/

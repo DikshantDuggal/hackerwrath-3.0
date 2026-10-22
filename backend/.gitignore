@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+KEYS_GUIDE.txt
+KEYS_CONFIGURATION.txt
+KEYS_REQUIRED.txt
