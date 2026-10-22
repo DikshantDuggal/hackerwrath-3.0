@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Edgerunners</string>
+    <string name="protection_unavailable">ਸੁਰੱਖਿਆ ਉਪਲਬਧ ਨਹੀਂ ਹੈ</string>
+    <string name="setup_required">ਕਾਲ ਰੂਟਿੰਗ ਅਤੇ ਲਾਈਵ ਵਿਸ਼ਲੇਸ਼ਣ ਅਜੇ ਜੁੜੇ ਨਹੀਂ ਹਨ।</string>
+    <string name="warning_otp">ਕਾਲਰ ਨੂੰ ਆਪਣਾ ਓਟੀਪੀ ਜਾਂ ਤਸਦੀਕ ਕੋਡ ਨਾ ਦੱਸੋ।</string>
+    <string name="warning_pin">ਇਹ ਭੁਗਤਾਨ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਤੁਹਾਨੂੰ ਆਪਣਾ ਯੂਪੀਆਈ ਪਿੰਨ ਪਾਉਣ ਦੀ ਲੋੜ ਨਹੀਂ ਹੈ।</string>
+    <string name="warning_qr">ਇਹ ਭੁਗਤਾਨ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਤੁਹਾਨੂੰ ਕਾਲਰ ਦਾ ਭੁਗਤਾਨ ਕਿਊਆਰ ਸਕੈਨ ਕਰਨ ਦੀ ਲੋੜ ਨਹੀਂ ਹੈ।</string>
+</resources>

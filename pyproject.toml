@@ -1,0 +1,23 @@
+[project]
+name = "edgerunners"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+cache-dir = ".cache/uv"
+
+[tool.uv.workspace]
+members = ["apps/api", "packages/contracts", "packages/detection"]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1",
+  "pytest>=8.3,<10",
+  "watchfiles>=1,<2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "EventType": {
+      "enum": [
+        "advisory",
+        "confirmed"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "RequestType": {
+      "enum": [
+        "qr_receive",
+        "pin_receive",
+        "otp_share",
+        "none"
+      ],
+      "title": "RequestType",
+      "type": "string"
+    },
+    "WarningLevel": {
+      "enum": [
+        "possible",
+        "high"
+      ],
+      "title": "WarningLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "v": {
+      "const": 1,
+      "default": 1,
+      "title": "V",
+      "type": "integer"
+    },
+    "call_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Call Id",
+      "type": "string"
+    },
+    "event_seq": {
+      "minimum": 1,
+      "title": "Event Seq",
+      "type": "integer"
+    },
+    "assessment_revision": {
+      "minimum": 1,
+      "title": "Assessment Revision",
+      "type": "integer"
+    },
+    "type": {
+      "$ref": "#/$defs/EventType"
+    },
+    "alert_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Alert Id",
+      "type": "string"
+    },
+    "request_type": {
+      "$ref": "#/$defs/RequestType"
+    },
+    "level": {
+      "$ref": "#/$defs/WarningLevel"
+    }
+  },
+  "required": [
+    "call_id",
+    "event_seq",
+    "assessment_revision",
+    "type",
+    "alert_id",
+    "request_type",
+    "level"
+  ],
+  "title": "WarningEvent",
+  "type": "object"
+}

@@ -1,0 +1,12 @@
+*
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!apps/
+!apps/api/
+!apps/api/**
+!packages/
+!packages/**
+**/__pycache__
+**/dist
+**/.env*

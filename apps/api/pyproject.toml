@@ -1,0 +1,22 @@
+[project]
+name = "edgerunners-api"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "edgerunners-contracts",
+  "edgerunners-detection",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "websockets>=15,<18",
+]
+
+[tool.uv.sources]
+edgerunners-contracts = { workspace = true }
+edgerunners-detection = { workspace = true }
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/edgerunners_api"]

@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Edgerunners</string>
+    <string name="protection_unavailable">Protection unavailable</string>
+    <string name="setup_required">Call routing and live analysis are not connected yet.</string>
+    <string name="warning_otp">Do not share your OTP or verification code with the caller.</string>
+    <string name="warning_pin">You do not need to enter your UPI PIN to receive this payment.</string>
+    <string name="warning_qr">You do not need to scan the caller’s payment QR to receive this payment.</string>
+</resources>

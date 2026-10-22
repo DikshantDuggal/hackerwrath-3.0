@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Edgerunners</string>
+    <string name="protection_unavailable">सुरक्षा उपलब्ध नहीं है</string>
+    <string name="setup_required">कॉल रूटिंग और लाइव विश्लेषण अभी जुड़े नहीं हैं।</string>
+    <string name="warning_otp">कॉलर को अपना ओटीपी या सत्यापन कोड न बताएं।</string>
+    <string name="warning_pin">यह भुगतान प्राप्त करने के लिए आपको अपना यूपीआई पिन डालने की ज़रूरत नहीं है।</string>
+    <string name="warning_qr">यह भुगतान प्राप्त करने के लिए आपको कॉलर का भुगतान क्यूआर स्कैन करने की ज़रूरत नहीं है।</string>
+</resources>

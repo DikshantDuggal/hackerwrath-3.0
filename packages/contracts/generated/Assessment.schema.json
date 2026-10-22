@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "RequestType": {
+      "enum": [
+        "qr_receive",
+        "pin_receive",
+        "otp_share",
+        "none"
+      ],
+      "title": "RequestType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "request_type": {
+      "$ref": "#/$defs/RequestType"
+    },
+    "confidence": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "Confidence",
+      "type": "string"
+    },
+    "setup_only": {
+      "title": "Setup Only",
+      "type": "boolean"
+    },
+    "requester_is_speaker": {
+      "title": "Requester Is Speaker",
+      "type": "boolean"
+    },
+    "evidence_turn_ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Evidence Turn Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "request_type",
+    "confidence",
+    "setup_only",
+    "requester_is_speaker",
+    "evidence_turn_ids"
+  ],
+  "title": "Assessment",
+  "type": "object"
+}
