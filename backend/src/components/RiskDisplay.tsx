@@ -28,7 +28,24 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
     );
   }
 
-  const { risk_level, risk_score, caption, reasons, recommended_action, confidence, evidence, rule_analysis, contextual_analysis } = assessment;
+  const {
+    risk_level = 'LOW',
+    risk_score = 0,
+    caption = 'Monitoring conversation',
+    reasons = [],
+    recommended_action = 'Continue with normal caution',
+    confidence = 0.9,
+    rule_analysis = { rule_score: 0, triggered_indicators: [], suppressed_protective_matches: [] } as any,
+    contextual_analysis = {} as any,
+  } = assessment || {};
+
+  const safeReasons = Array.isArray(reasons) ? reasons : [];
+  const safeTriggered = Array.isArray(rule_analysis?.triggered_indicators)
+    ? rule_analysis.triggered_indicators
+    : [];
+  const safeSuppressed = Array.isArray(rule_analysis?.suppressed_protective_matches)
+    ? rule_analysis.suppressed_protective_matches
+    : [];
 
   const levelConfig = {
     LOW: {
@@ -164,10 +181,10 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
           </div>
 
           {/* Reasons */}
-          {reasons.length > 0 && (
+          {safeReasons.length > 0 && (
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-[var(--text-secondary)]">Analysis Details</h4>
-              {reasons.slice(0, 5).map((reason, i) => (
+              {safeReasons.slice(0, 5).map((reason, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm">
                   <span className="mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: config.color }} />
                   <span className="text-[var(--text-muted)]">{reason}</span>
@@ -179,14 +196,14 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
       </div>
 
       {/* Triggered Indicators */}
-      {rule_analysis.triggered_indicators.length > 0 && (
+      {safeTriggered.length > 0 && (
         <div className="glass-card p-5">
           <h4 className="text-sm font-semibold text-[var(--red-alert)] mb-3 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
-            Triggered Indicators ({rule_analysis.triggered_indicators.length})
+            Triggered Indicators ({safeTriggered.length})
           </h4>
           <div className="grid gap-2">
-            {rule_analysis.triggered_indicators.map((ind, i) => (
+            {safeTriggered.map((ind, i) => (
               <div key={i} className="glass p-3 text-sm border-red-500/10">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
@@ -204,13 +221,13 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
       )}
 
       {/* Suppressed Protective Matches */}
-      {rule_analysis.suppressed_protective_matches.length > 0 && (
+      {safeSuppressed.length > 0 && (
         <div className="glass-card p-5">
           <h4 className="text-sm font-semibold text-[var(--green-accent)] mb-3 flex items-center gap-2">
             <CheckCircle className="w-4 h-4" />
             Protective Advice Detected
           </h4>
-          {rule_analysis.suppressed_protective_matches.map((match, i) => (
+          {safeSuppressed.map((match, i) => (
             <div key={i} className="text-sm text-[var(--text-muted)] flex items-center gap-2 py-1">
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--green-accent)] flex-shrink-0" />
               {match}
@@ -220,7 +237,7 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
       )}
 
       {/* Contextual AI Insights */}
-      {contextual_analysis.caller_identity_claim && (
+      {Boolean(contextual_analysis?.caller_identity_claim) && (
         <div className="glass-card p-5">
           <h4 className="text-sm font-semibold text-[var(--purple-bright)] mb-3">
             Contextual Intelligence
@@ -228,21 +245,21 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="glass p-3">
               <span className="text-[var(--text-muted)] text-xs">Claimed Identity</span>
-              <p className="text-[var(--text-primary)] font-medium">{contextual_analysis.caller_identity_claim}</p>
+              <p className="text-[var(--text-primary)] font-medium">{contextual_analysis?.caller_identity_claim}</p>
             </div>
-            {contextual_analysis.claimed_organisation && (
+            {Boolean(contextual_analysis?.claimed_organisation) && (
               <div className="glass p-3">
                 <span className="text-[var(--text-muted)] text-xs">Claimed Organization</span>
-                <p className="text-[var(--text-primary)] font-medium">{contextual_analysis.claimed_organisation}</p>
+                <p className="text-[var(--text-primary)] font-medium">{contextual_analysis?.claimed_organisation}</p>
               </div>
             )}
             <div className="glass p-3">
               <span className="text-[var(--text-muted)] text-xs">Intent</span>
               <p className="font-mono text-xs" style={{ color: config.color }}>
-                {contextual_analysis.intent_classification}
+                {contextual_analysis?.intent_classification || 'Standard'}
               </p>
             </div>
-            {contextual_analysis.possible_impersonation && (
+            {Boolean(contextual_analysis?.possible_impersonation) && (
               <div className="glass p-3 border-red-500/20">
                 <span className="text-[var(--text-muted)] text-xs">Impersonation</span>
                 <p className="text-[var(--red-alert)] font-medium">⚠ Possible Impersonation</p>

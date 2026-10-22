@@ -18,6 +18,7 @@ import {
   Flame,
   PhoneCall,
   Clock,
+  Headphones,
 } from 'lucide-react';
 import { audioAlerts } from '../utils/audioAlerts';
 import type { RiskAssessment } from '../hooks/useLiveDetection';
@@ -32,7 +33,7 @@ interface StoredUtterance {
   riskScore: number;
   flaggedKeywords: string[];
   safeAction?: string;
-  source: 'microphone' | 'preset' | 'telegram_bridge';
+  source: 'microphone' | 'preset' | 'telegram_bridge' | 'dual_capture';
 }
 
 interface LiveVoiceTesterProps {
@@ -47,9 +48,10 @@ export default function LiveVoiceTester({
   activeRisk,
 }: LiveVoiceTesterProps) {
   const [isRecording, setIsRecording] = useState(false);
+  const [captureMode, setCaptureMode] = useState<'mic' | 'dual'>('mic');
   const [languageCode, setLanguageCode] = useState('auto');
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [statusText, setStatusText] = useState('Ready for live microphone voice detection');
+  const [statusText, setStatusText] = useState('Ready for live voice detection');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [callId] = useState(() => `mic-live-${Date.now().toString(36)}`);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -65,6 +67,7 @@ export default function LiveVoiceTester({
   const liveWsRef = useRef<WebSocket | null>(null);
   const animFrameRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
+  const systemStreamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const speechRecognitionRef = useRef<any>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -107,6 +110,10 @@ export default function LiveVoiceTester({
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+    }
+    if (systemStreamRef.current) {
+      systemStreamRef.current.getTracks().forEach((t) => t.stop());
+      systemStreamRef.current = null;
     }
     if (audioContextRef.current) {
       audioContextRef.current.close().catch(() => {});
@@ -249,14 +256,34 @@ export default function LiveVoiceTester({
     audioAlerts.playClick();
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // 1. Microphone capture
+      const micStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
         },
       });
-      streamRef.current = stream;
+      streamRef.current = micStream;
+
+      // 2. Dual Mode: System / Telegram Audio capture if selected
+      let systemStream: MediaStream | null = null;
+      if (captureMode === 'dual') {
+        try {
+          systemStream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            },
+          });
+          systemStreamRef.current = systemStream;
+        } catch (displayErr) {
+          console.warn('System audio selection cancelled or unavailable:', displayErr);
+          setStatusText('⚠️ System audio sharing cancelled. Proceeding with Microphone only.');
+        }
+      }
 
       // Connect Direct WebSocket to Backend Live Stream
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -265,7 +292,11 @@ export default function LiveVoiceTester({
       liveWsRef.current = ws;
 
       ws.onopen = () => {
-        setStatusText('🟢 Continuous Call Shield Active: Streaming 16kHz audio & transcribing every ~7-8 words...');
+        setStatusText(
+          captureMode === 'dual' && systemStream
+            ? '🟢 Dual Shield Active: Capturing Microphone + Telegram/System Audio...'
+            : '🟢 Continuous Call Shield Active: Streaming 16kHz audio & transcribing every ~7-8 words...'
+        );
       };
 
       ws.onmessage = (event) => {
@@ -285,19 +316,41 @@ export default function LiveVoiceTester({
               riskScore: data.riskScore,
               flaggedKeywords: data.flaggedKeywords || [],
               safeAction: data.recommendedAction,
-              source: 'microphone',
+              source: captureMode === 'dual' && systemStream ? 'dual_capture' : 'microphone',
             };
 
             setStoredUtterances((prev) => [newUtterance, ...prev]);
 
             if (onAssessmentUpdate) {
+              const triggered = (data.flaggedKeywords || []).map((k: string) => ({
+                indicator_name: k,
+                keyword_or_pattern: k,
+                category: 'SUSPICIOUS_PHRASE',
+                weight: 15,
+                matched_text: k,
+              }));
+
               onAssessmentUpdate({
-                risk_score: data.riskScore,
-                risk_level: data.riskLevel,
-                caption: data.text,
-                reasons: data.flaggedKeywords?.map((k: string) => `Flagged indicator: ${k}`) || [],
-                recommended_action: data.recommendedAction,
+                risk_score: data.riskScore ?? 0,
+                risk_level: data.riskLevel ?? 'LOW',
+                caption: data.text || textChunk,
+                reasons: (data.flaggedKeywords && data.flaggedKeywords.length > 0)
+                  ? data.flaggedKeywords.map((k: string) => `Flagged indicator: ${k}`)
+                  : ['Analyzing conversation in real time'],
+                recommended_action: data.recommendedAction || 'Continue with normal caution',
                 confidence: 0.94,
+                evidence: data.flaggedKeywords || [],
+                rule_analysis: {
+                  rule_score: data.riskScore ?? 0,
+                  triggered_indicators: triggered,
+                  suppressed_protective_matches: [],
+                },
+                contextual_analysis: {
+                  caller_identity_claim: 'Call Participant',
+                  claimed_organisation: 'Unknown',
+                  intent_classification: (data.riskLevel === 'CRITICAL' || data.riskLevel === 'HIGH') ? 'Suspicious Solicitation' : 'General Speech',
+                  possible_impersonation: Boolean(data.riskLevel === 'CRITICAL' || data.riskLevel === 'HIGH'),
+                },
               } as any);
             }
 
@@ -330,10 +383,24 @@ export default function LiveVoiceTester({
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const actx = new AudioCtx({ sampleRate: 16000 });
       audioContextRef.current = actx;
-      const source = actx.createMediaStreamSource(stream);
+
+      // Audio Graph with Mixer Bus
+      const mixer = actx.createGain();
+      mixer.gain.value = 1.0;
+
+      // Connect Mic
+      const micSource = actx.createMediaStreamSource(micStream);
+      micSource.connect(mixer);
+
+      // Connect System Audio if present
+      if (systemStream && systemStream.getAudioTracks().length > 0) {
+        const sysSource = actx.createMediaStreamSource(systemStream);
+        sysSource.connect(mixer);
+      }
+
       const analyser = actx.createAnalyser();
       analyser.fftSize = 64;
-      source.connect(analyser);
+      mixer.connect(analyser);
       analyserRef.current = analyser;
 
       // Extract 16kHz PCM16LE mono chunks and stream over WebSocket
@@ -348,8 +415,13 @@ export default function LiveVoiceTester({
         }
         liveWsRef.current.send(pcm16.buffer);
       };
-      source.connect(processor);
-      processor.connect(actx.destination);
+      mixer.connect(processor);
+
+      // Connect processor to destination with zero gain to prevent mic feedback echo
+      const muteGain = actx.createGain();
+      muteGain.gain.value = 0;
+      processor.connect(muteGain);
+      muteGain.connect(actx.destination);
       processorNodeRef.current = processor;
 
       const buffer = new Uint8Array(analyser.frequencyBinCount);
@@ -492,34 +564,61 @@ export default function LiveVoiceTester({
 
   return (
     <div className="glass-card p-6 md:p-8 space-y-6">
-      {/* Top Banner & Language Selector */}
+      {/* Top Banner, Audio Mode & Language Selector */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-            <h2 className="text-lg font-bold gradient-text">Live Microphone Voice Shield</h2>
+            <h2 className="text-lg font-bold gradient-text">Live Call & Voice Shield</h2>
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Real-Time Speech Ingestion, Temporary Memory & Immediate Scam Keyword Flagging
+            Real-Time Speech Ingestion, Telegram Monitoring & Immediate Scam Keyword Flagging
           </p>
         </div>
 
-        {/* Language selector */}
-        <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-[var(--purple-candle)]" />
-          <select
-            value={languageCode}
-            onChange={(e) => setLanguageCode(e.target.value)}
-            disabled={isRecording}
-            className="glass px-3 py-1.5 rounded-xl text-xs font-mono bg-black/40 text-white border-white/15 focus:outline-none focus:border-[var(--purple-bright)]"
-          >
-            <option value="auto">🌐 Auto Detect (Hi/En/Pa)</option>
-            <option value="hi-IN">🇮🇳 Hindi (हिन्दी)</option>
-            <option value="en-IN">🇬🇧 Indian English</option>
-            <option value="pa-IN">🇵🇦 Punjabi (ਪੰਜਾਬੀ)</option>
-          </select>
+        {/* Audio Mode & Language selectors */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Audio Source Mode */}
+          <div className="flex items-center gap-1.5">
+            <Headphones className="w-4 h-4 text-[var(--purple-candle)]" />
+            <select
+              value={captureMode}
+              onChange={(e) => setCaptureMode(e.target.value as 'mic' | 'dual')}
+              disabled={isRecording}
+              className="glass px-3 py-1.5 rounded-xl text-xs font-mono bg-black/40 text-white border-white/15 focus:outline-none focus:border-[var(--purple-bright)]"
+              title="Select audio source: Mic only (speakers) or Dual (captures Telegram call audio directly)"
+            >
+              <option value="mic">🎙️ Mic Only (Speakers / Laptop)</option>
+              <option value="dual">🎧 Dual: Mic + Telegram Call Audio (Headphones)</option>
+            </select>
+          </div>
+
+          {/* Language selector */}
+          <div className="flex items-center gap-1.5">
+            <Globe className="w-4 h-4 text-[var(--purple-candle)]" />
+            <select
+              value={languageCode}
+              onChange={(e) => setLanguageCode(e.target.value)}
+              disabled={isRecording}
+              className="glass px-3 py-1.5 rounded-xl text-xs font-mono bg-black/40 text-white border-white/15 focus:outline-none focus:border-[var(--purple-bright)]"
+            >
+              <option value="auto">🌐 Auto Detect (Hi/En/Pa)</option>
+              <option value="hi-IN">🇮🇳 Hindi (हिन्दी)</option>
+              <option value="en-IN">🇬🇧 Indian English</option>
+              <option value="pa-IN">🇵🇦 Punjabi (ਪੰਜਾਬੀ)</option>
+            </select>
+          </div>
         </div>
       </div>
+
+      {captureMode === 'dual' && !isRecording && (
+        <div className="glass px-4 py-2.5 rounded-xl border-purple-500/20 bg-purple-950/25 text-xs text-purple-200 flex items-center gap-2">
+          <Headphones className="w-4 h-4 text-purple-400 flex-shrink-0" />
+          <span>
+            <strong>Dual Mode Active:</strong> When you click Talk, your browser will prompt to share audio. Select your <strong>Telegram Window / Screen</strong> and ensure <strong>"Also share system audio"</strong> is checked so your caller's voice is captured through headphones.
+          </span>
+        </div>
+      )}
 
       {/* Main Mic Control + Visualizer */}
       <div className="flex flex-col items-center justify-center py-4 text-center space-y-4">

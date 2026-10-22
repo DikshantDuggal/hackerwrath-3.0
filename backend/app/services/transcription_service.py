@@ -180,11 +180,20 @@ class SarvamSaarasProvider(BaseSpeechToTextProvider):
         self, data: Dict[str, object], default_lang: str
     ) -> TranscriptionResponse:
         transcript = str(data.get("transcript", "")).strip()
-        if not transcript:
-            raise TranscriptionUpstreamError(
-                502, "Upstream STT returned an empty transcript."
-            )
         lang = str(data.get("language_code", default_lang))
+        duration = float(data.get("duration_seconds", 0.0))
+        if not transcript:
+            return TranscriptionResponse(
+                provider=self.provider_name,
+                model=self.settings.sarvam_stt_model,
+                language_code=lang,
+                transcript="",
+                confidence=0.0,
+                duration_seconds=duration,
+                segments=[],
+                streaming_ready=True,
+                operational_status="WORKING",
+            )
         confidence = float(data.get("confidence", 0.92))
         duration = float(data.get("duration_seconds", 3.5))
         raw_segments = data.get("segments")
