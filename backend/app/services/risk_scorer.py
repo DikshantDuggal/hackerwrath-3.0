@@ -71,6 +71,7 @@ class RiskScorer:
         end_seconds: Optional[float] = 5.0,
         deepfake_result: Optional[DeepfakeAnalysisResult] = None,
         sync_status: Optional[Dict[str, Any]] = None,
+        rag_result: Optional[Dict[str, Any]] = None,
     ) -> ScamRiskAssessment:
         reasons: List[str] = []
         evidence: List[EvidenceItem] = []
@@ -87,6 +88,24 @@ class RiskScorer:
                     indicator=ind.keyword_or_pattern,
                 )
             )
+
+        # Collect RAG semantic evidence
+        if rag_result and isinstance(rag_result, dict):
+            rag_expl = rag_result.get("explanation")
+            if rag_expl and rag_expl not in reasons:
+                reasons.append(f"[RAG Semantic Analysis] {rag_expl}")
+            for ex in rag_result.get("retrieved_examples", []):
+                if isinstance(ex, dict) and ex.get("label") == "SCAM":
+                    sim = ex.get("similarity", 0.0)
+                    evidence.append(
+                        EvidenceItem(
+                            excerpt=f"Matched case: {ex.get('text', '')[:75]}...",
+                            start_seconds=start_seconds,
+                            end_seconds=end_seconds,
+                            source="rag_retrieval",
+                            indicator=f"Cosine similarity {sim:.2f}",
+                        )
+                    )
 
         # Collect contextual AI reasons & evidence
         if contextual_result.possible_impersonation and contextual_result.claimed_organisation:
@@ -193,10 +212,13 @@ class RiskScorer:
         # Compute weighted risk score (0–100 scale)
         w_rule = self.settings.rule_score_weight
         w_ctx = 0.0 if ai_failed else self.settings.contextual_score_weight
-        weight_sum = max(0.01, w_rule + w_ctx)
+        has_valid_rag = bool(rag_result and isinstance(rag_result, dict) and not rag_result.get("insufficient_evidence"))
+        w_rag = self.settings.rag_score_weight if has_valid_rag else 0.0
+        weight_sum = max(0.01, w_rule + w_ctx + w_rag)
 
+        rag_contribution = w_rag * float(rag_result.get("risk_score", 0.0)) if has_valid_rag else 0.0
         combined = (
-            w_rule * rule_result.rule_score + w_ctx * contextual_result.intent_risk_score
+            w_rule * rule_result.rule_score + w_ctx * contextual_result.intent_risk_score + rag_contribution
         ) / weight_sum
 
         # Synergy boost when both Rule Engine and Contextual Director detect strong solicitation
@@ -256,6 +278,7 @@ class RiskScorer:
             recommended_action=alert.safe_action,
             rule_analysis=rule_result,
             contextual_analysis=contextual_result,
+            rag_analysis=rag_result,
             deepfake_analysis=deepfake_result,
             alert=alert,
             synchronization_status=sync_status or {"working": True},

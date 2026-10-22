@@ -160,6 +160,12 @@ class Settings:
     enable_cross_call_keyword_sync: bool = field(
         default_factory=lambda: _env_bool("ENABLE_CROSS_CALL_KEYWORD_SYNC", True)
     )
+    enable_live_rag: bool = field(
+        default_factory=lambda: _env_bool("ENABLE_LIVE_RAG", False)
+    )
+    rag_score_weight: float = field(
+        default_factory=lambda: _env_float("RAG_SCORE_WEIGHT", 0.35)
+    )
     enable_deepfake_detection: bool = field(
         default_factory=lambda: _env_bool("ENABLE_DEEPFAKE_DETECTION", False)
     )

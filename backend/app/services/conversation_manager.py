@@ -46,6 +46,7 @@ class ConversationManager:
         risk_scorer: Optional[RiskScorer] = None,
         keyword_sync_service: Optional[KeywordSyncService] = None,
         telegram_service: Optional[TelegramAlertService] = None,
+        rag_service: Optional[Any] = None,
         settings: Optional[Settings] = None,
     ) -> None:
         self.settings = settings or get_settings()
@@ -59,6 +60,16 @@ class ConversationManager:
         )
         self.risk_scorer = risk_scorer or RiskScorer(settings=self.settings)
         self.telegram_service = telegram_service or get_telegram_service()
+        self.rag_service = rag_service
+
+    def _get_rag_service(self) -> Optional[Any]:
+        if self.rag_service is None and getattr(self.settings, "enable_live_rag", False):
+            try:
+                from app.rag.service import get_rag_service
+                self.rag_service = get_rag_service()
+            except Exception as exc:
+                logger.debug("RAG service unavailable for conversation manager: %s", exc)
+        return self.rag_service
 
     def analyze_standalone_transcript(
         self, request: TranscriptAnalysisRequest
@@ -73,6 +84,15 @@ class ConversationManager:
         ctx_res = self.contextual_analyzer.analyze(
             request.transcript, conversation_history=request.conversation_history
         )
+        rag_result_dict = None
+        rag_svc = self._get_rag_service()
+        if rag_svc and getattr(self.settings, "enable_live_rag", False):
+            try:
+                rag_resp = rag_svc.classify_text(request.transcript, top_k=3)
+                rag_result_dict = rag_resp.model_dump()
+            except Exception as rag_err:
+                logger.debug("RAG classification skipped on standalone transcript: %s", rag_err)
+
         assessment = self.risk_scorer.score(
             rule_result=rule_res,
             contextual_result=ctx_res,
@@ -80,6 +100,7 @@ class ConversationManager:
             start_seconds=request.start_seconds,
             end_seconds=request.end_seconds,
             sync_status=self.keyword_sync.get_sync_status(),
+            rag_result=rag_result_dict,
         )
         if request.call_id and self.telegram_service.is_enabled:
             try:
@@ -165,6 +186,15 @@ class ConversationManager:
         if len(state.recent_utterances) > 12:
             state.recent_utterances = state.recent_utterances[-12:]
 
+        rag_result_dict = None
+        rag_svc = self._get_rag_service()
+        if rag_svc and getattr(self.settings, "enable_live_rag", False):
+            try:
+                rag_resp = rag_svc.classify_text(segment.text, top_k=3)
+                rag_result_dict = rag_resp.model_dump()
+            except Exception as rag_err:
+                logger.debug("RAG classification skipped on segment: %s", rag_err)
+
         assessment = self.risk_scorer.score(
             rule_result=cumulative_rule_result,
             contextual_result=contextual_result,
@@ -172,6 +202,7 @@ class ConversationManager:
             start_seconds=segment.start_seconds,
             end_seconds=segment.end_seconds,
             sync_status=self.keyword_sync.get_sync_status(),
+            rag_result=rag_result_dict,
         )
 
         seq_num = len(state.segments) + 1
