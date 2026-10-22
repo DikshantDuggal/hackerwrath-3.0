@@ -184,6 +184,9 @@ class Settings:
     telegram_webhook_secret: str = field(
         default_factory=lambda: os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
     )
+    bridge_secret: str = field(
+        default_factory=lambda: os.getenv("BRIDGE_SECRET", "").strip()
+    )
     telegram_timeout_seconds: float = field(
         default_factory=lambda: _env_float("TELEGRAM_TIMEOUT_SECONDS", 4.0)
     )

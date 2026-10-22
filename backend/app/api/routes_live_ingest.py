@@ -110,6 +110,15 @@ async def websocket_live_ingest(
     WebSocket endpoint ingesting real-time audio from onfloor telegram-bridge.
     """
     await websocket.accept()
+
+    expected_secret = settings.bridge_secret or settings.telegram_webhook_secret
+    if expected_secret:
+        client_secret = websocket.headers.get("x-bridge-secret", "")
+        if client_secret != expected_secret:
+            logger.warning("Rejected unauthorized WebSocket live ingest connection")
+            await websocket.close(code=1008)
+            return
+
     logger.info("Telegram live call audio bridge connected")
 
     call_id: Optional[str] = None
@@ -222,8 +231,8 @@ async def websocket_live_ingest(
                         except Exception as exc:
                             logger.warning("Error processing Telegram audio slice: %s", exc)
 
-    except WebSocketDisconnect:
-        logger.info("Telegram bridge WebSocket disconnected (%s)", call_id)
+    except (WebSocketDisconnect, RuntimeError) as disconnect_exc:
+        logger.info("Telegram bridge WebSocket disconnected cleanly (%s): %s", call_id, disconnect_exc)
     except Exception as exc:
         logger.error("Telegram bridge error: %s", exc)
         try:

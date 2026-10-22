@@ -193,7 +193,7 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
                     {ind.category}
                   </span>
                   <span className="text-xs text-[var(--text-muted)]">
-                    Weight: {Math.round(ind.weight * 100)}%
+                    Weight: {Math.round(ind.weight > 1.0 ? ind.weight : ind.weight * 100)}%
                   </span>
                 </div>
                 <p className="text-[var(--text-secondary)] mt-1">{ind.explanation}</p>

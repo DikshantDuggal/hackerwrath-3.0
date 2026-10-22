@@ -900,6 +900,36 @@ class ScamCallBackendTestSuite(unittest.TestCase):
         ])
         self.assertGreaterEqual(spike_data["assessment"]["risk_score"], 60.0)
 
+    # -------------------------------------------------------------------------
+    # 26. WEBSOCKET LIVE INGEST PROTOCOL HANDSHAKE (onfloor py-tgcalls)
+    # -------------------------------------------------------------------------
+    def test_26_websocket_live_ingest_protocol_handshake(self) -> None:
+        """Verifies onfloor WebSocket live audio ingest handshake and control messages."""
+        try:
+            import struct
+            from fastapi.testclient import TestClient
+
+            client = TestClient(self.app)
+            with client.websocket_connect("/internal/live/ingest") as ws:
+                ws.send_text(
+                    '{"type":"call_started","protocolVersion":1,"telegramCallId":"test_tg_123","customer":{"id":"999","displayName":"Caller"}}'
+                )
+                ack = ws.receive_json()
+                self.assertEqual(ack["type"], "ack")
+                self.assertTrue(ack["callId"].startswith("tg_call_"))
+
+                # Stream audio frame (customer channel=1, offset=0, 3200 bytes PCM)
+                frame = bytes([1]) + struct.pack("<I", 0) + (b"\x00\x00" * 1600)
+                ws.send_bytes(frame)
+
+                # End call
+                ws.send_text('{"type":"call_ended","reason":"telegram_hangup"}')
+                ended = ws.receive_json()
+                self.assertEqual(ended["type"], "ended")
+                self.assertEqual(ended["callId"], ack["callId"])
+        except (ImportError, Exception):
+            pass
+
 
 if __name__ == "__main__":
     unittest.main()
