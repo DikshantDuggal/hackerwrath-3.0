@@ -28,4 +28,6 @@ node_modules/
 **/vector_store/*.jsonl
 **/vector_store/chroma/
 !**/data/data_quality_report.json
+!**/data/multilingual_data_quality_report.json
 !**/vector_store/evaluation_report.json
+!**/vector_store/baseline_val_report.json

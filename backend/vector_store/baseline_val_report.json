@@ -1,0 +1,71 @@
+{
+  "overall": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0,
+    "scam_metrics": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "legitimate_metrics": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "confusion_matrix": {
+      "tn_legit": 1795,
+      "fp_scam": 0,
+      "fn_legit": 0,
+      "tp_scam": 1046
+    },
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0,
+    "avg_latency_ms": 1.121
+  },
+  "english": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0,
+    "scam_metrics": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "legitimate_metrics": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "confusion_matrix": {
+      "tn_legit": 897,
+      "fp_scam": 0,
+      "fn_legit": 0,
+      "tp_scam": 523
+    },
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0,
+    "avg_latency_ms": 1.045
+  },
+  "hindi": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0,
+    "scam_metrics": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "legitimate_metrics": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "confusion_matrix": {
+      "tn_legit": 898,
+      "fp_scam": 0,
+      "fn_legit": 0,
+      "tp_scam": 523
+    },
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0,
+    "avg_latency_ms": 1.196
+  }
+}

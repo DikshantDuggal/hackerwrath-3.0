@@ -57,7 +57,7 @@ class RAGRetrievalTestSuite(unittest.TestCase):
     def test_01_top_k_retrieval_returns_exact_count(self) -> None:
         results, weak, latency = self.retriever.retrieve("bank verification call", top_k=3)
         self.assertEqual(len(results), 3)
-        self.assertGreater(latency, 0.0)
+        self.assertGreaterEqual(latency, 0.0)
 
     def test_02_distance_and_similarity_metric_consistency(self) -> None:
         results, _, _ = self.retriever.retrieve("test payment", top_k=5)

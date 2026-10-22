@@ -186,13 +186,17 @@ def main() -> None:
     metrics_rag["avg_retrieval_latency_ms"] = round(float(np.mean(retrieval_latencies)), 2)
 
     # -------------------------------------------------------------
-    # Targeted Benchmark Probe: Protective vs Solicitation vs Inbound
+    # Targeted Benchmark Probe: Protective vs Solicitation vs Inbound (Multilingual)
     # -------------------------------------------------------------
     probe_cases = [
-        {"id": "Probe_Protective", "text": "Never share your OTP with anyone. Our bank representatives never ask for it.", "expected": "LEGITIMATE"},
-        {"id": "Probe_Solicitation", "text": "Tell me the OTP you just received right now so I can verify your account.", "expected": "SCAM"},
-        {"id": "Probe_AuthNotice", "text": "Your OTP for login is 492018. Valid for 10 minutes. Do not share.", "expected": "LEGITIMATE"},
-        {"id": "Probe_UrgentFreeze", "text": "Your bank account has been blocked immediately. Transfer 5000 to unfreeze.", "expected": "SCAM"},
+        {"id": "Probe_Protective_EN", "text": "Never share your OTP with anyone. Our bank representatives never ask for it.", "expected": "LEGITIMATE"},
+        {"id": "Probe_Protective_HI", "text": "किसी के साथ भी अपना ओटीपी साझा न करें। बैंक अधिकारी कभी भी यह नहीं मांगते।", "expected": "LEGITIMATE"},
+        {"id": "Probe_Solicitation_EN", "text": "Tell me the OTP you just received right now so I can verify your account.", "expected": "SCAM"},
+        {"id": "Probe_Solicitation_HI", "text": "सत्यापित करने के लिए अपना ओटीपी तुरंत साझा करें।", "expected": "SCAM"},
+        {"id": "Probe_AuthNotice_EN", "text": "Your OTP for login is 492018. Valid for 10 minutes. Do not share.", "expected": "LEGITIMATE"},
+        {"id": "Probe_AuthNotice_HI", "text": "लॉगिन के लिए आपका ओटीपी 492018 है। 10 मिनट के लिए वैध है।", "expected": "LEGITIMATE"},
+        {"id": "Probe_UrgentFreeze_EN", "text": "Your bank account has been blocked immediately. Transfer 5000 to unfreeze.", "expected": "SCAM"},
+        {"id": "Probe_UrgentFreeze_HI", "text": "आपका बैंक खाता तुरंत ब्लॉक कर दिया गया है। कानूनी कार्रवाई से बचने के लिए तुरंत भुगतान करें।", "expected": "SCAM"},
     ]
 
     probe_results = []
@@ -208,15 +212,35 @@ def main() -> None:
             "passed": passed,
         })
 
+    # Per-Language Slice Evaluation
+    en_indices = [i for i, r in enumerate(test_records) if r.get("language") == "en"]
+    hi_indices = [i for i, r in enumerate(test_records) if r.get("language") == "hi"]
+
+    en_base_metrics = evaluate_predictions([y_true[i] for i in en_indices], [y_pred_baseline[i] for i in en_indices]) if en_indices else {}
+    hi_base_metrics = evaluate_predictions([y_true[i] for i in hi_indices], [y_pred_baseline[i] for i in hi_indices]) if hi_indices else {}
+
+    en_rag_metrics = evaluate_predictions([y_true[i] for i in en_indices], [y_pred_rag[i] for i in en_indices]) if en_indices else {}
+    hi_rag_metrics = evaluate_predictions([y_true[i] for i in hi_indices], [y_pred_rag[i] for i in hi_indices]) if hi_indices else {}
+
     # Summary Report
     report = {
         "dataset": {
             "test_size": total_test,
             "scam_count": sum(1 for y in y_true if y == "SCAM"),
             "legit_count": sum(1 for y in y_true if y == "LEGITIMATE"),
+            "english_test_count": len(en_indices),
+            "hindi_test_count": len(hi_indices),
         },
-        "system_1_tfidf_baseline": metrics_baseline,
-        "system_2_rag_classifier": metrics_rag,
+        "system_1_tfidf_baseline": {
+            "overall": metrics_baseline,
+            "english_slice": en_base_metrics,
+            "hindi_slice": hi_base_metrics,
+        },
+        "system_2_rag_classifier": {
+            "overall": metrics_rag,
+            "english_slice": en_rag_metrics,
+            "hindi_slice": hi_rag_metrics,
+        },
         "targeted_probes": probe_results,
     }
 
@@ -226,7 +250,11 @@ def main() -> None:
     print("\n======================= FINAL EVALUATION BENCHMARK =======================")
     print(f"{'Metric':<30} | {'TF-IDF + LogReg':<18} | {'RAG Semantic System':<20}")
     print("-" * 75)
-    print(f"{'Accuracy':<30} | {metrics_baseline['accuracy']:<18.4f} | {metrics_rag['accuracy']:<20.4f}")
+    print(f"{'Overall Accuracy':<30} | {metrics_baseline['accuracy']:<18.4f} | {metrics_rag['accuracy']:<20.4f}")
+    if en_base_metrics and en_rag_metrics:
+        print(f"{'English Accuracy':<30} | {en_base_metrics['accuracy']:<18.4f} | {en_rag_metrics['accuracy']:<20.4f}")
+    if hi_base_metrics and hi_rag_metrics:
+        print(f"{'Hindi Accuracy':<30} | {hi_base_metrics['accuracy']:<18.4f} | {hi_rag_metrics['accuracy']:<20.4f}")
     print(f"{'Macro F1-Score':<30} | {metrics_baseline['macro_f1']:<18.4f} | {metrics_rag['macro_f1']:<20.4f}")
     print(f"{'SCAM Precision':<30} | {metrics_baseline['scam_metrics']['precision']:<18.4f} | {metrics_rag['scam_metrics']['precision']:<20.4f}")
     print(f"{'SCAM Recall':<30} | {metrics_baseline['scam_metrics']['recall']:<18.4f} | {metrics_rag['scam_metrics']['recall']:<20.4f}")

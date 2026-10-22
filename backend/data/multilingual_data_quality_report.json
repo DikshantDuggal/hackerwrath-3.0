@@ -1,0 +1,58 @@
+{
+  "english_audit": {
+    "language": "en",
+    "total_files": 18974,
+    "legit_raw": 11978,
+    "scam_raw": 6996,
+    "empty_files": 0,
+    "duplicates_removed": 9492,
+    "canonical_unique_records": 9482,
+    "legit_canonical": 5989,
+    "scam_canonical": 3493
+  },
+  "hindi_audit": {
+    "language": "hi",
+    "total_files": 18974,
+    "legit_raw": 11978,
+    "scam_raw": 6996,
+    "empty_files": 0,
+    "duplicates_removed": 9489,
+    "canonical_unique_records": 9485,
+    "legit_canonical": 5992,
+    "scam_canonical": 3493
+  },
+  "cross_dataset_stats": {
+    "total_unique_dialogues": 9485,
+    "label_conflicts": 0,
+    "train_dialogues": 6639,
+    "val_dialogues": 1421,
+    "test_dialogues": 1425,
+    "train_records_combined": 13277,
+    "val_records_combined": 2841,
+    "test_records_combined": 2849,
+    "test_en_records": 1424,
+    "test_hi_records": 1425
+  },
+  "class_distributions": {
+    "train": {
+      "SCAM": 4890,
+      "LEGITIMATE": 8387
+    },
+    "val": {
+      "SCAM": 1046,
+      "LEGITIMATE": 1795
+    },
+    "test": {
+      "SCAM": 1050,
+      "LEGITIMATE": 1799
+    },
+    "test_en": {
+      "SCAM": 525,
+      "LEGITIMATE": 899
+    },
+    "test_hi": {
+      "SCAM": 525,
+      "LEGITIMATE": 900
+    }
+  }
+}

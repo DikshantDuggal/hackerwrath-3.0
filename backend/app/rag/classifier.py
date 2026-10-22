@@ -28,20 +28,24 @@ logger = get_logger("scam_detector.rag.classifier")
 
 _GLOBAL_CLASSIFIER: Optional[RAGScamClassifier] = None
 
-# High-precision patterns for context differentiation
+# High-precision patterns for context differentiation (English, Hinglish & Devanagari Hindi)
 PROTECTIVE_ADVICE_RE = re.compile(
     r"\b(?:never|don'?t|do not|kabhi (?:bhi )?mat|alert|warning|beware|rule)\b.*"
     r"\b(?:share|give|tell|disclose|bhejo|batana)\b.*"
     r"\b(?:otp|pin|password|cvv|credentials|details)\b"
     r"|"
-    r"\b(?:never share|do not share|don'?t give|kabhi mat batana)\b",
+    r"\b(?:never share|do not share|don'?t give|kabhi mat batana)\b"
+    r"|"
+    r"(?:साझा\s+न\s+करें|कभी\s+(?:भी\s+)?मत\s+बताएं|किसी\s+को\s+न\s+दें|ओटीपी\s+शेयर\s+न\s+करें|बैंक\s+अधिकारी\s+कभी\s+नहीं\s+मांगते)",
     re.IGNORECASE,
 )
 
 INBOUND_AUTH_NOTIFICATION_RE = re.compile(
     r"\b(?:your|aapka|apka)\s+(?:otp|verification code|login code)\s+(?:is|for|to)\s+\d{4,8}\b"
     r"|"
-    r"\bdo not share this code with anyone\b",
+    r"\bdo not share this code with anyone\b"
+    r"|"
+    r"(?:लॉगिन\s+के\s+लिए\s+आपका\s+ओटीपी|ओटीपी\s+कोड\s+\d{4,8}\s+है)",
     re.IGNORECASE,
 )
 
@@ -51,13 +55,17 @@ ACTIVE_SOLICITATION_RE = re.compile(
     r"\b(?:otp|pin|cvv|code|password)\b"
     r"|"
     r"\b(?:verify|authenticate|unblock|confirm)\s+(?:your\s+)?(?:account|card|kyc|identity)\b.*"
-    r"\b(?:otp|pin|code)\b",
+    r"\b(?:otp|pin|code)\b"
+    r"|"
+    r"(?:ओटीपी.*(?:बताएं|दीजिए|साझा|भेजें|सत्यापित)|सत्यापित.*ओटीपी|अपना\s+ओटीपी)",
     re.IGNORECASE,
 )
 
 COERCION_URGENCY_RE = re.compile(
     r"\b(?:blocked|suspended|frozen|arrest|police|legal action|penalty|cbi|customs|fine)\b.*"
-    r"\b(?:within|immediately|turant|hours?|minutes?|urgent|now)\b",
+    r"\b(?:within|immediately|turant|hours?|minutes?|urgent|now)\b"
+    r"|"
+    r"(?:खाता.*(?:ब्लॉक|बंद|फ्रीज)|तुरंत.*(?:भुगतान|सत्यापित|ट्रांसफर)|कानूनी\s+कार्रवाई|जुर्माना)",
     re.IGNORECASE,
 )
 
@@ -160,9 +168,9 @@ class RAGScamClassifier:
             )
 
         # Case C: Active Credential Solicitation or Coercive Threat
-        elif is_active_solicitation or (is_coercion and rag_scam_ratio >= 0.40):
+        elif is_active_solicitation or (is_coercion and not is_protective):
             classification = "SCAM"
-            # Base risk from solicitation (70) plus RAG evidence
+            # Base risk from solicitation/coercion (75) plus RAG evidence
             risk_score = min(100.0, 75.0 + (rag_scam_ratio * 25.0))
             confidence = max(0.85, max_scam_sim)
             if is_active_solicitation:
