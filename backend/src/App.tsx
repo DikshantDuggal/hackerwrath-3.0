@@ -79,7 +79,7 @@ export default function App() {
         const assessment: RiskAssessment = await res.json();
         setActiveRisk(assessment);
 
-        if (assessment.risk_level === 'HIGH') {
+        if (assessment.risk_level === 'HIGH' || assessment.risk_level === 'CRITICAL') {
           audioAlerts.playHighRiskAlert();
         } else if (assessment.risk_level === 'MEDIUM') {
           audioAlerts.playCautionAlert();

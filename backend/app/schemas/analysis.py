@@ -1,13 +1,13 @@
 """
 Pydantic schemas for Rule-Based Detection, Contextual AI Director Analysis,
-Calibrated Scam Risk Scoring, and Alert Generation.
+Heuristic Scam Risk Scoring (0–100 scale), and Alert Generation.
 """
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 from app.core.compat import BaseModel, Field
 
-RiskLevelType = Literal["LOW", "MEDIUM", "HIGH", "UNKNOWN"]
+RiskLevelType = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"]
 IntentClassificationType = Literal[
     "SCAM_SOLICITATION",
     "SUSPICIOUS_PRESSURE",
@@ -30,7 +30,7 @@ class TriggeredIndicator(BaseModel):
     rule_id: str
     category: str
     keyword_or_pattern: str
-    weight: float = Field(default=0.0, ge=0.0, le=1.0)
+    weight: float = Field(default=0.0, ge=0.0, le=100.0)
     excerpt: str
     start_seconds: Optional[float] = None
     end_seconds: Optional[float] = None
@@ -41,7 +41,7 @@ class TriggeredIndicator(BaseModel):
 class RuleEngineResult(BaseModel):
     """Output of the configurable Rule-Based Detection Engine."""
 
-    rule_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    rule_score: float = Field(default=0.0, ge=0.0, le=100.0)
     triggered_indicators: List[TriggeredIndicator] = Field(default_factory=list)
     suppressed_protective_matches: List[str] = Field(default_factory=list)
     duplicate_indicators_skipped: int = Field(default=0, ge=0)
@@ -63,7 +63,7 @@ class ContextualAIWireSchema(BaseModel):
     supporting_excerpts: List[str] = Field(default_factory=list)
     contextual_caption: str = Field(default="Monitoring call intent")
     intent_classification: IntentClassificationType = "LEGITIMATE_INQUIRY"
-    intent_risk_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    intent_risk_score: float = Field(default=0.0, ge=0.0, le=100.0)
     model_confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
@@ -80,7 +80,7 @@ class ContextualAnalysisOutput(BaseModel):
     supporting_excerpts: List[str] = Field(default_factory=list)
     contextual_caption: str = Field(default="Monitoring call intent")
     intent_classification: IntentClassificationType = "LEGITIMATE_INQUIRY"
-    intent_risk_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    intent_risk_score: float = Field(default=0.0, ge=0.0, le=100.0)
     model_confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     service_status: AiServiceStatusType = "OK"
 
@@ -123,9 +123,15 @@ class ScamRiskAssessment(BaseModel):
     """
     Unified Scam Risk Assessment combining Rule-Based Evidence, Contextual AI Director,
     Cross-Call Keyword Synchronization, and Optional Deepfake Detection.
+    Uses consistent 0–100 heuristic risk score with thresholds:
+      0–29: LOW
+      30–59: MEDIUM
+      60–79: HIGH
+      80–100: CRITICAL
+      UNKNOWN: Insufficient/unreliable evidence
     """
 
-    risk_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    risk_score: float = Field(default=0.0, ge=0.0, le=100.0)
     p_scam: Optional[float] = Field(default=None)
     risk_level: RiskLevelType = "LOW"
     confidence: Optional[float] = Field(default=0.85, ge=0.0, le=1.0)

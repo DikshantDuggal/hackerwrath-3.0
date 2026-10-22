@@ -41,15 +41,23 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     ("never ask for your otp", "Official security reminder"),
     ("bank employees never ask for pin", "Official bank security reminder"),
     ("we will never ask for your password", "Official security reminder"),
+    ("never click on unknown links", "Protective security advice against malicious links"),
+    ("do not click on suspicious links", "Protective security advice against phishing links"),
+    ("never install anydesk", "Protective advice against installing remote access tools"),
+    ("digital arrest is a fraud", "Protective advice warning about digital arrest scam"),
+    ("police never arrests over video call", "Protective security explanation"),
     # Hindi protective advice (Romanized & Devanagari)
     ("kabhi bhi kisi ko otp mat batana", "Hindi protective advice against sharing OTP"),
     ("kisi ko otp mat batana", "Hindi protective advice against sharing OTP"),
     ("otp mat batana", "Hindi protective advice against sharing OTP"),
     ("pin mat batana", "Hindi protective advice against sharing PIN"),
     ("kisi ke saath otp share na karein", "Hindi protective advice"),
+    ("kisi link par click mat karna", "Hindi protective advice against links"),
+    ("anydesk install mat karna", "Hindi protective advice against remote tools"),
     ("ओटीपी मत बताना", "Hindi protective advice in Devanagari"),
     ("कभी भी ओटीपी साझा न करें", "Hindi protective advice in Devanagari"),
     ("पिन मत डालें", "Hindi protective advice in Devanagari"),
+    ("किसी लिंक पर क्लिक न करें", "Hindi protective advice in Devanagari"),
     # Punjabi protective advice (Romanized & Gurmukhi)
     ("kise nu otp na dasso", "Punjabi protective advice against sharing OTP"),
     ("otp na dasso", "Punjabi protective advice against sharing OTP"),
@@ -59,8 +67,25 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     ("send me your qr", "Legitimate payer asking for payee's QR code to send payment"),
     ("can you send me your qr", "Legitimate payer asking for payee's QR code"),
     ("share your qr so i can pay", "Legitimate payer asking for payee's QR code"),
+    ("send me your upi id", "Legitimate payer asking for UPI ID"),
+    ("share your upi id so i can pay", "Legitimate payer asking for UPI ID"),
     ("aapka upi id bhej do main pay kar", "Legitimate payer asking for UPI ID to pay"),
     ("apna qr bhej do main payment kar", "Legitimate payer asking for QR to pay"),
+    ("apna qr bhejo main paise bhejta hoon", "Legitimate payer asking for QR to pay"),
+    ("apna bank account bhejo payment karne ke liye", "Legitimate payer asking for account to pay"),
+    # Legitimate customer banking queries & requests
+    ("check my balance", "Legitimate customer balance inquiry"),
+    ("account balance inquiry", "Legitimate customer balance inquiry"),
+    ("mera balance kitna hai", "Legitimate customer balance inquiry in Hindi"),
+    ("mera account balance check karna", "Legitimate customer balance check in Hindi"),
+    ("khate da balance dasso", "Legitimate customer balance check in Punjabi"),
+    ("mini statement nikalna hai", "Legitimate customer mini statement request"),
+    ("account statement bhej do", "Legitimate customer statement request"),
+    ("passbook update karwani hai", "Legitimate customer passbook update inquiry"),
+    ("visit nearest branch", "Legitimate bank recommendation to visit physical branch"),
+    ("visit your branch with documents", "Legitimate branch visit guidance"),
+    ("branch aakar kyc karwa lijiye", "Legitimate guidance to visit branch in person"),
+    ("atm jaakar pin change karein", "Legitimate advice to use official ATM for PIN change"),
 )
 
 
@@ -249,6 +274,35 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
         ),
         explanation="Caller used high-pressure urgency, secrecy demands, or prompt-injection commands.",
     ),
+    RulePatternDef(
+        rule_id="RULE_SUSPICIOUS_LINK_OR_APK",
+        category="SUSPICIOUS_LINK_OR_APK",
+        pattern_label="suspicious_link_or_apk",
+        phrases=(
+            "click this link",
+            "click on the link",
+            "open the link",
+            "link par click karo",
+            "link pe click karo",
+            "link click karo",
+            "sms mein link bheja",
+            "whatsapp te link bhejea",
+            "whatsapp par link bheja",
+            "link open karo",
+            "download the apk",
+            "install this apk",
+            "apk download karo",
+            "apk install karo",
+            "apk file bheji hai",
+            "ਲਿੰਕ ਤੇ ਕਲਿੱਕ ਕਰੋ",
+            "ਲਿੰਕ ਖੋਲ੍ਹੋ",
+            "ਏਪੀਕੇ ਇੰਸਟਾਲ ਕਰੋ",
+            "लिंक पर क्लिक करें",
+            "लिंक ओपन करें",
+            "एपीके डाउनलोड",
+        ),
+        explanation="Caller asked the user to click a suspicious link or install an unverified APK.",
+    ),
 )
 
 
@@ -341,7 +395,8 @@ class RulesEngine:
                             break
 
                         seen.add(dedup_key)
-                        weight = float(self.weights.get(rule_def.category, 0.30))
+                        raw_w = float(self.weights.get(rule_def.category, 30.0))
+                        weight = raw_w * 100.0 if 0.0 < raw_w <= 1.0 else raw_w
                         triggered.append(
                             TriggeredIndicator(
                                 rule_id=rule_def.rule_id,
@@ -356,11 +411,11 @@ class RulesEngine:
                             )
                         )
                         # Sync high-signal phrase to cross-call KeywordSyncService if call_id provided
-                        if call_id and weight >= 0.44:
+                        if call_id and weight >= 40.0:
                             self.keyword_sync.register_or_sync_keyword(
                                 keyword=norm_phrase,
                                 category=rule_def.category,
-                                weight=min(0.40, weight),
+                                weight=min(40.0, weight),
                                 source_call_id=call_id,
                             )
                         break
@@ -381,12 +436,14 @@ class RulesEngine:
 
                 seen.add(dedup_key)
                 synced_matched.append(sync_entry.keyword)
+                raw_sync_w = float(self.weights.get("CROSS_CALL_SYNCED_KEYWORD", sync_entry.weight))
+                sync_w = raw_sync_w * 100.0 if 0.0 < raw_sync_w <= 1.0 else raw_sync_w
                 triggered.append(
                     TriggeredIndicator(
                         rule_id="RULE_CROSS_CALL_SYNC",
                         category=sync_entry.category,
                         keyword_or_pattern=sync_entry.keyword,
-                        weight=float(self.weights.get("CROSS_CALL_SYNCED_KEYWORD", sync_entry.weight)),
+                        weight=sync_w,
                         excerpt=clause[:200],
                         start_seconds=start_seconds,
                         end_seconds=end_seconds,
@@ -395,15 +452,16 @@ class RulesEngine:
                     )
                 )
 
-        # Combine weights using diminishing-returns noisy-OR style aggregation capped at 1.0:
-        # 1 - prod(1 - w_i) so multiple independent indicators compound cleanly without exceeding 1.0.
+        # Combine weights using diminishing-returns noisy-OR style aggregation in 0–100 scale:
+        # 1 - prod(1 - w_i) so multiple independent indicators compound cleanly.
         if not triggered:
             rule_score = 0.0
         else:
             complement = 1.0
             for item in triggered:
-                complement *= max(0.0, 1.0 - min(0.95, item.weight))
-            rule_score = round(min(1.0, 1.0 - complement), 4)
+                norm_w = (item.weight / 100.0) if item.weight > 1.0 else item.weight
+                complement *= max(0.0, 1.0 - min(0.95, norm_w))
+            rule_score = round(min(100.0, (1.0 - complement) * 100.0), 2)
 
         return (
             RuleEngineResult(

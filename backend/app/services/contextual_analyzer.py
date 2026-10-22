@@ -7,6 +7,9 @@ outputs with Pydantic while handling malformed responses, timeouts, and service 
 from __future__ import annotations
 
 import json
+import re
+import urllib.error
+import urllib.request
 from typing import Any, Callable, Dict, List, Optional
 from app.core.compat import ValidationError
 from app.core.config import Settings, get_settings
@@ -54,7 +57,18 @@ class ContextualAnalyzer:
     def parse_and_validate_llm_json(self, raw_payload: str) -> ContextualAnalysisOutput:
         """Validates raw JSON string against ContextualAIWireSchema using Pydantic."""
         try:
-            validated = ContextualAIWireSchema.model_validate_json(raw_payload)
+            cleaned = (raw_payload or "").strip()
+            # If wrapped in markdown code blocks like ```json ... ```, strip them
+            if "```" in cleaned:
+                code_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, re.DOTALL)
+                if code_match:
+                    cleaned = code_match.group(1).strip()
+            if not cleaned.startswith("{") and "{" in cleaned and "}" in cleaned:
+                start = cleaned.find("{")
+                end = cleaned.rfind("}") + 1
+                cleaned = cleaned[start:end]
+
+            validated = ContextualAIWireSchema.model_validate_json(cleaned)
             dumped = validated.model_dump()
             return ContextualAnalysisOutput(**dumped, service_status="OK")
         except (ValidationError, ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -66,6 +80,44 @@ class ContextualAnalyzer:
                 model_confidence=0.0,
                 service_status="MALFORMED_OUTPUT",
             )
+
+    def _call_live_sarvam_chat(self, transcript: str, history: List[str]) -> str:
+        """Invokes Sarvam AI chat completions (sarvam-105b) for structured contextual intent."""
+        url = f"{self.settings.sarvam_base_url.rstrip('/')}/v1/chat/completions"
+        user_content = (
+            f"Transcript to analyze: {transcript}\n"
+            f"Recent Conversation History: {' . '.join(history[-4:]) if history else 'None'}\n"
+            "Evaluate caller intent and output ONLY a JSON object conforming strictly to ContextualAIWireSchema."
+        )
+        payload = {
+            "model": self.settings.sarvam_llm_model,
+            "messages": [
+                {"role": "system", "content": CONTEXTUAL_DIRECTOR_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            "temperature": 0.1,
+            "max_tokens": 2500,
+        }
+        encoded = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url=url,
+            data=encoded,
+            method="POST",
+            headers={
+                "api-subscription-key": self.settings.sarvam_api_key,
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=self.settings.sarvam_timeout_seconds) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            choices = data.get("choices", [])
+            if not choices:
+                raise ContextualServiceUnavailableError("No choices returned from Sarvam chat completions")
+            msg = choices[0].get("message", {})
+            content = msg.get("content") or ""
+            if not content.strip():
+                raise ContextualServiceUnavailableError("Empty content from Sarvam chat completions")
+            return content
 
     def analyze(
         self,
@@ -87,7 +139,7 @@ class ContextualAnalyzer:
                 service_status="OK",
             )
 
-        # 1. If a custom/mocked or live LLM callable is configured, invoke and validate it
+        # 1. Injected custom callable (used in unit tests for deterministic errors/mocks)
         if self.llm_callable is not None:
             try:
                 raw_response = self.llm_callable(cleaned, history)
@@ -111,7 +163,20 @@ class ContextualAnalyzer:
                     service_status="UNAVAILABLE",
                 )
 
-        # 2. Semantic Contextual Intent Analyzer across combined history + current segment
+        # 2. Live Sarvam AI contextual call (if live API key configured and ENABLE_LIVE_SARVAM_LLM=true)
+        if self.settings.has_live_sarvam_key and self.settings.enable_live_sarvam_llm:
+            try:
+                raw_response = self._call_live_sarvam_chat(cleaned, history)
+                validated_output = self.parse_and_validate_llm_json(raw_response)
+                if validated_output.service_status == "OK":
+                    return validated_output
+            except Exception as exc:
+                logger.info(
+                    "Live Sarvam LLM chat unavailable (%s); falling back to semantic engine",
+                    type(exc).__name__,
+                )
+
+        # 3. Deterministic Semantic Contextual Intent Analyzer across combined history + current segment
         return self._semantic_intent_evaluation(cleaned, history)
 
     def _semantic_intent_evaluation(
@@ -214,11 +279,19 @@ class ContextualAnalyzer:
                     "tell me the otp",
                     "share the otp",
                     "share your otp",
+                    "share the code",
                     "otp batao",
                     "otp bata do",
                     "code batao",
+                    "code bata do",
+                    "bhejo otp",
+                    "otp bhej do",
                     "mainu dasso",
                     "otp dasso",
+                    "code dasso",
+                    "otp dass",
+                    "code dass",
+                    "pin dasso",
                     "upi pin daal",
                     "pin daalo",
                     "pin daal do",
@@ -283,6 +356,33 @@ class ContextualAnalyzer:
             money_or_sensitive.append("Device takeover / remote screen view request")
             excerpts.append(current_text[:180])
 
+        asks_for_suspicious_link = any(
+            p in norm
+            for p in (
+                "click this link",
+                "click on the link",
+                "open the link",
+                "link par click",
+                "link pe click",
+                "link click karo",
+                "sms mein link",
+                "whatsapp te link",
+                "whatsapp par link",
+                "download the apk",
+                "install this apk",
+                "apk download",
+                "apk install",
+                "ਲਿੰਕ ਤੇ ਕਲਿੱਕ",
+                "ਏਪੀਕੇ",
+                "लिंक पर क्लिक",
+            )
+        )
+        if asks_for_suspicious_link:
+            requested_actions.append("Click suspicious link or download unverified APK")
+            money_or_sensitive.append("Malicious link / APK download instruction")
+            if current_text[:180] not in excerpts:
+                excerpts.append(current_text[:180])
+
         has_threats_or_coercion = any(
             p in norm
             for p in (
@@ -324,9 +424,33 @@ class ContextualAnalyzer:
             if current_text[:180] not in excerpts:
                 excerpts.append(current_text[:180])
 
+        has_pressure_or_secrecy = any(
+            p in norm
+            for p in (
+                "do not disconnect the call",
+                "don't tell anyone",
+                "call mat kaatna",
+                "kisi ko mat batana",
+                "jaldi batao",
+                "alert band karo",
+                "कॉल मत काटना",
+                "जल्दी बताओ",
+                "ਕਾਲ ਨਾ ਕੱਟੋ",
+                "ਜਲਦੀ ਦੱਸੋ",
+            )
+        )
+        if has_pressure_or_secrecy:
+            threats_urgency.append("High-pressure urgency or secrecy demand")
+            if current_text[:180] not in excerpts:
+                excerpts.append(current_text[:180])
+
         # Compute intent classification, risk score, and Contextual Director caption
         if protective_explanations and not (
-            asks_for_otp_or_pin or asks_to_scan_qr_for_payout or asks_for_remote_access or has_threats_or_coercion
+            asks_for_otp_or_pin
+            or asks_to_scan_qr_for_payout
+            or asks_for_remote_access
+            or asks_for_suspicious_link
+            or has_threats_or_coercion
         ):
             return ContextualAnalysisOutput(
                 caller_identity_claim=caller_identity,
@@ -339,33 +463,38 @@ class ContextualAnalyzer:
                 supporting_excerpts=[current_text[:180]],
                 contextual_caption="Protective security reminder or legitimate payment coordination detected",
                 intent_classification="PROTECTIVE_WARNING" if is_protective_otp else "LEGITIMATE_INQUIRY",
-                intent_risk_score=0.05,
+                intent_risk_score=0.0,
                 model_confidence=0.92,
                 service_status="OK",
             )
 
-        risk = 0.08
+        # Neutral baseline is 0.0 (never arbitrary non-zero defaults for harmless text)
+        risk = 0.0
         if asks_for_otp_or_pin:
-            risk += 0.58
+            risk += 58.0
         if asks_to_scan_qr_for_payout:
-            risk += 0.58
+            risk += 58.0
         if asks_for_remote_access:
-            risk += 0.62
+            risk += 62.0
+        if asks_for_suspicious_link:
+            risk += 45.0
         if has_threats_or_coercion:
-            risk += 0.42
+            risk += 45.0
         if has_urgent_payment:
-            risk += 0.38
+            risk += 38.0
         if possible_impersonation:
-            risk += 0.25
+            risk += 25.0
+        if has_pressure_or_secrecy:
+            risk += 25.0
 
-        risk = round(min(0.98, risk), 4)
+        risk = round(min(98.0, risk), 2)
 
-        if risk >= 0.60:
+        if risk >= 60.0:
             intent_cls = "SCAM_SOLICITATION"
             caption = (
                 f"High-risk scam solicitation: {', '.join(requested_actions or threats_urgency)}"
             )[:160]
-        elif risk >= 0.30:
+        elif risk >= 30.0:
             intent_cls = "SUSPICIOUS_PRESSURE"
             caption = "Suspicious authority claim, urgency, or payment setup detected"
         else:
@@ -384,6 +513,6 @@ class ContextualAnalyzer:
             contextual_caption=caption,
             intent_classification=intent_cls,
             intent_risk_score=risk,
-            model_confidence=0.88 if risk >= 0.30 else 0.85,
+            model_confidence=0.88 if risk >= 30.0 else 0.85,
             service_status="OK",
         )

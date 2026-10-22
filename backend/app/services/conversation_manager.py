@@ -88,6 +88,25 @@ class ConversationManager:
         """
         state = self.repository.get_or_create(call_id)
 
+        # Detect exact duplicate segments (e.g. repeated network retries)
+        is_exact_duplicate = any(
+            s.speaker == segment.speaker
+            and s.text.strip() == segment.text.strip()
+            and abs((s.start_seconds or 0.0) - (segment.start_seconds or 0.0)) < 0.1
+            for s in state.segments
+        )
+        if is_exact_duplicate and state.latest_assessment:
+            state.total_duplicates_skipped += 1
+            self.repository.save(state)
+            return CallSegmentUpdateResponse(
+                call_id=call_id,
+                segment_id=state.segments[-1].segment_id if state.segments else f"seg_{len(state.segments):03d}",
+                sequence_number=len(state.segments),
+                duplicate_evidence_suppressed=state.total_duplicates_skipped,
+                synced_keywords_triggered=list(state.synced_keywords_hit),
+                assessment=state.latest_assessment,
+            )
+
         # Evaluate new segment against rules engine, passing `state.seen_rule_keys`
         # so repeated evidence across segments is skipped rather than double-counted.
         segment_rule_res, updated_seen_keys = self.rules_engine.evaluate(
@@ -109,14 +128,15 @@ class ConversationManager:
             if skw not in state.synced_keywords_hit:
                 state.synced_keywords_hit.append(skw)
 
-        # Recompute cumulative rule score across all unique indicators in this call
+        # Recompute cumulative rule score across all unique indicators in this call (0–100 scale)
         if not state.accumulated_indicators:
             cumulative_rule_score = 0.0
         else:
             complement = 1.0
             for item in state.accumulated_indicators:
-                complement *= max(0.0, 1.0 - min(0.95, item.weight))
-            cumulative_rule_score = round(min(1.0, 1.0 - complement), 4)
+                w = item.weight / 100.0 if item.weight > 1.0 else item.weight
+                complement *= max(0.0, 1.0 - min(0.95, w))
+            cumulative_rule_score = round(min(100.0, (1.0 - complement) * 100.0), 2)
 
         cumulative_rule_result = RuleEngineResult(
             rule_score=cumulative_rule_score,
@@ -154,6 +174,7 @@ class ConversationManager:
             language_code=segment.language_code,
             start_seconds=segment.start_seconds,
             end_seconds=segment.end_seconds,
+            text=segment.text,
             transcript_confidence=segment.transcript_confidence,
             detected_indicators=[
                 i.keyword_or_pattern for i in segment_rule_res.triggered_indicators

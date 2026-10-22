@@ -22,9 +22,9 @@ class KeywordSyncService:
     def _seed_default_synced_keywords(self) -> None:
         now = time.time()
         defaults = [
-            ("digital arrest", "THREAT_ARREST_OR_LEGAL_ACTION", 0.45, "seed_campaign"),
-            ("army canteen qr", "QR_SCAN_TO_RECEIVE_MONEY", 0.42, "seed_campaign"),
-            ("kyc verification apk", "REMOTE_ACCESS_OR_SCREEN_SHARE", 0.48, "seed_campaign"),
+            ("digital arrest", "THREAT_ARREST_OR_LEGAL_ACTION", 45.0, "seed_campaign"),
+            ("army canteen qr", "QR_SCAN_TO_RECEIVE_MONEY", 42.0, "seed_campaign"),
+            ("kyc verification apk", "REMOTE_ACCESS_OR_SCREEN_SHARE", 48.0, "seed_campaign"),
         ]
         for kw, cat, weight, src in defaults:
             norm = kw.strip().lower()
@@ -42,11 +42,12 @@ class KeywordSyncService:
         self,
         keyword: str,
         category: str = "CROSS_CALL_SYNCED_KEYWORD",
-        weight: float = 0.25,
+        weight: float = 30.0,
         source_call_id: Optional[str] = None,
     ) -> KeywordSyncEntry:
         norm = " ".join(keyword.strip().lower().split())
         now = time.time()
+        norm_weight = round(weight * 100.0, 2) if 0.0 < weight <= 1.0 else weight
         if norm in self._entries:
             entry = self._entries[norm]
             entry.hit_count += 1
@@ -58,7 +59,7 @@ class KeywordSyncService:
         new_entry = KeywordSyncEntry(
             keyword=norm,
             category=category,
-            weight=weight,
+            weight=norm_weight,
             hit_count=1,
             source_calls=[source_call_id] if source_call_id else [],
             active=True,

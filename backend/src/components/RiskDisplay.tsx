@@ -55,6 +55,14 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
       label: 'DANGER',
       gradient: 'from-red-500/20 to-rose-500/10',
     },
+    CRITICAL: {
+      icon: <XCircle className="w-8 h-8 text-rose-500 animate-pulse" />,
+      color: '#ff2d55',
+      bgGlow: 'rgba(255, 45, 85, 0.16)',
+      border: 'rgba(255, 45, 85, 0.45)',
+      label: 'CRITICAL',
+      gradient: 'from-rose-600/30 to-red-600/20',
+    },
     UNKNOWN: {
       icon: <Info className="w-8 h-8" />,
       color: 'var(--text-muted)',
@@ -66,7 +74,7 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
   };
 
   const config = levelConfig[risk_level] || levelConfig.UNKNOWN;
-  const scorePercent = Math.round(risk_score * 100);
+  const scorePercent = Math.round(risk_score > 1 ? risk_score : risk_score * 100);
 
   return (
     <div className="space-y-4 animate-slide-up">
@@ -96,9 +104,9 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
                   >
                     {config.label}
                   </span>
-                  {risk_level === 'HIGH' && (
+                  {(risk_level === 'HIGH' || risk_level === 'CRITICAL') && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
-                      ⚠ SCAM DETECTED
+                      {risk_level === 'CRITICAL' ? '🚨 CRITICAL SCAM DETECTED' : '⚠ SCAM DETECTED'}
                     </span>
                   )}
                 </div>
@@ -117,7 +125,7 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
                   strokeWidth="4"
                   strokeLinecap="round"
                   strokeDasharray={`${2 * Math.PI * 35}`}
-                  strokeDashoffset={`${2 * Math.PI * 35 * (1 - risk_score)}`}
+                  strokeDashoffset={`${2 * Math.PI * 35 * (1 - (scorePercent / 100))}`}
                   style={{ transition: 'stroke-dashoffset 1s ease-out' }}
                 />
               </svg>

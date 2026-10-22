@@ -103,7 +103,7 @@ export default function LiveVoiceTester({
           if (update.assessment) {
             onAssessmentUpdate(update.assessment);
 
-            if (update.assessment.risk_level === 'HIGH') {
+            if (update.assessment.risk_level === 'HIGH' || update.assessment.risk_level === 'CRITICAL') {
               audioAlerts.playHighRiskAlert();
             } else if (update.assessment.risk_level === 'MEDIUM') {
               audioAlerts.playCautionAlert();
@@ -378,7 +378,9 @@ export default function LiveVoiceTester({
             <span>🛡️ Threat Assessment</span>
             <span
               className={`font-mono text-[10px] px-2 py-0.5 rounded-full border ${
-                activeRisk?.risk_level === 'HIGH'
+                activeRisk?.risk_level === 'CRITICAL'
+                  ? 'bg-rose-500/30 text-rose-300 border-rose-500/50 animate-pulse'
+                  : activeRisk?.risk_level === 'HIGH'
                   ? 'bg-red-500/20 text-red-400 border-red-500/40'
                   : activeRisk?.risk_level === 'MEDIUM'
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
@@ -402,8 +404,8 @@ export default function LiveVoiceTester({
           </div>
 
           <div className="pt-2 text-[10px] text-[var(--text-muted)] flex items-center justify-between border-t border-white/5 mt-2">
-            <span>Score: {Math.round((activeRisk?.risk_score || 0) * 100)}/100</span>
-            <span>Confidence: {Math.round((activeRisk?.confidence || 0.9) * 100)}%</span>
+            <span>Score: {Math.round((activeRisk?.risk_score || 0) > 1 ? (activeRisk?.risk_score || 0) : (activeRisk?.risk_score || 0) * 100)}/100</span>
+            <span>Confidence: {Math.round(((activeRisk?.confidence ?? 0.9) > 1 ? (activeRisk?.confidence ?? 0.9) : (activeRisk?.confidence ?? 0.9) * 100))}%</span>
           </div>
         </div>
       </div>

@@ -56,7 +56,8 @@ class RiskScorer:
         """
         if not self.settings.calibrated_probability_enabled:
             return None
-        z = self.settings.calibration_slope * risk_score + self.settings.calibration_intercept
+        norm_score = risk_score / 100.0 if risk_score > 1.0 else risk_score
+        z = self.settings.calibration_slope * norm_score + self.settings.calibration_intercept
         prob = 1.0 / (1.0 + math.exp(-z))
         return round(min(0.999, max(0.001, prob)), 4)
 
@@ -117,8 +118,9 @@ class RiskScorer:
 
         # Check for UNKNOWN condition 1: Low transcription quality
         if transcript_confidence < self.settings.min_transcript_confidence:
-            reasons.append(
-                f"Transcription confidence ({transcript_confidence:.2f}) is below minimum reliability threshold ({self.settings.min_transcript_confidence:.2f})."
+            reasons.insert(
+                0,
+                f"Transcription confidence ({transcript_confidence:.2f}) is below minimum reliability threshold ({self.settings.min_transcript_confidence:.2f}).",
             )
             alert = self.alert_service.build_alert("UNKNOWN", 0.0, rule_result.triggered_indicators)
             return ScamRiskAssessment(
@@ -143,13 +145,13 @@ class RiskScorer:
             "MALFORMED_OUTPUT",
             "UNAVAILABLE",
         )
-        if ai_failed and rule_result.rule_score < 0.45:
+        if ai_failed and rule_result.rule_score < 45.0:
             reasons.append(
                 f"Contextual AI service status is {contextual_result.service_status} and rule-based evidence alone is insufficient for a reliable classification."
             )
             alert = self.alert_service.build_alert("UNKNOWN", rule_result.rule_score, rule_result.triggered_indicators)
             return ScamRiskAssessment(
-                risk_score=round(rule_result.rule_score * 0.5, 4),
+                risk_score=round(rule_result.rule_score * 0.5, 2),
                 p_scam=None,
                 risk_level="UNKNOWN",
                 confidence=0.30,
@@ -188,7 +190,7 @@ class RiskScorer:
                 synchronization_status=sync_status or {"working": True},
             )
 
-        # Compute weighted risk score
+        # Compute weighted risk score (0–100 scale)
         w_rule = self.settings.rule_score_weight
         w_ctx = 0.0 if ai_failed else self.settings.contextual_score_weight
         weight_sum = max(0.01, w_rule + w_ctx)
@@ -198,8 +200,8 @@ class RiskScorer:
         ) / weight_sum
 
         # Synergy boost when both Rule Engine and Contextual Director detect strong solicitation
-        if rule_result.rule_score >= 0.40 and contextual_result.intent_risk_score >= 0.55:
-            combined = min(1.0, combined + 0.14)
+        if rule_result.rule_score >= 40.0 and contextual_result.intent_risk_score >= 55.0:
+            combined = min(100.0, combined + 14.0)
 
         # Never classify a call based ONLY on a weak keyword match if Contextual Director
         # sees no solicitation/threat intent
@@ -207,27 +209,22 @@ class RiskScorer:
             rule_result.rule_score > 0.0
             and len(rule_result.triggered_indicators) == 1
             and contextual_result.intent_classification in ("PROTECTIVE_WARNING", "LEGITIMATE_INQUIRY")
-            and contextual_result.intent_risk_score < 0.20
+            and contextual_result.intent_risk_score < 20.0
         ):
-            combined = min(combined, 0.22)
+            combined = min(combined, 22.0)
             reasons.append(
                 "Single rule indicator was tempered because contextual intent analysis found no solicitation or threat."
             )
 
-        # Optional deepfake boost
-        if deepfake_result and deepfake_result.enabled and deepfake_result.is_suspected_deepfake:
-            combined = min(1.0, combined + self.settings.deepfake_score_weight * deepfake_result.spoof_score)
-            reasons.append(deepfake_result.explanation)
+        # Deepfake analysis is kept structurally separate per Requirement 6
+        risk_score = round(min(100.0, max(0.0, combined)), 2)
 
-        risk_score = round(min(1.0, max(0.0, combined)), 4)
-
-        # Determine risk level
-        if risk_score >= self.settings.high_risk_threshold or (
-            risk_score >= self.settings.medium_risk_threshold
-            and contextual_result.intent_classification == "SCAM_SOLICITATION"
-            and rule_result.rule_score >= 0.45
-        ):
-            risk_level: RiskLevelType = "HIGH"
+        # Determine risk level with configurable thresholds:
+        # 80-100: CRITICAL, 60-79: HIGH, 30-59: MEDIUM, 0-29: LOW
+        if risk_score >= self.settings.critical_risk_threshold:
+            risk_level: RiskLevelType = "CRITICAL"
+        elif risk_score >= self.settings.medium_risk_threshold:
+            risk_level = "HIGH"
         elif risk_score >= self.settings.low_risk_threshold:
             risk_level = "MEDIUM"
         else:

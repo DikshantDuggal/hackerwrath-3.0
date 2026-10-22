@@ -32,6 +32,13 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _env_threshold(name: str, default: float) -> float:
+    val = _env_float(name, default)
+    if 0.0 < val <= 1.0:
+        return val * 100.0
+    return val
+
+
 def _env_int(name: str, default: int) -> int:
     val = os.getenv(name)
     if val is None:
@@ -43,15 +50,16 @@ def _env_int(name: str, default: int) -> int:
 
 
 DEFAULT_RULE_WEIGHTS: Dict[str, float] = {
-    "OTP_OR_PIN_REQUEST": 0.48,
-    "QR_SCAN_TO_RECEIVE_MONEY": 0.50,
-    "REMOTE_ACCESS_OR_SCREEN_SHARE": 0.52,
-    "THREAT_ARREST_OR_LEGAL_ACTION": 0.44,
-    "ACCOUNT_SUSPENSION_THREAT": 0.36,
-    "AUTHORITY_OR_BANK_IMPERSONATION": 0.34,
-    "URGENT_PAYMENT_DEMAND": 0.32,
-    "PRESSURE_AND_SECRECY_TACTIC": 0.28,
-    "CROSS_CALL_SYNCED_KEYWORD": 0.25,
+    "OTP_OR_PIN_REQUEST": 55.0,
+    "QR_SCAN_TO_RECEIVE_MONEY": 55.0,
+    "REMOTE_ACCESS_OR_SCREEN_SHARE": 60.0,
+    "THREAT_ARREST_OR_LEGAL_ACTION": 50.0,
+    "ACCOUNT_SUSPENSION_THREAT": 40.0,
+    "AUTHORITY_OR_BANK_IMPERSONATION": 35.0,
+    "URGENT_PAYMENT_DEMAND": 35.0,
+    "PRESSURE_AND_SECRECY_TACTIC": 30.0,
+    "SUSPICIOUS_LINK_OR_APK": 45.0,
+    "CROSS_CALL_SYNCED_KEYWORD": 30.0,
 }
 
 
@@ -75,6 +83,9 @@ class Settings:
     )
     sarvam_timeout_seconds: float = field(
         default_factory=lambda: _env_float("SARVAM_TIMEOUT_SECONDS", 5.0)
+    )
+    enable_live_sarvam_llm: bool = field(
+        default_factory=lambda: _env_bool("ENABLE_LIVE_SARVAM_LLM", False)
     )
 
     # Audio validation & size limits
@@ -102,13 +113,16 @@ class Settings:
         default_factory=lambda: _env_float("DEEPFAKE_SCORE_WEIGHT", 0.15)
     )
     low_risk_threshold: float = field(
-        default_factory=lambda: _env_float("LOW_RISK_THRESHOLD", 0.30)
+        default_factory=lambda: _env_threshold("LOW_RISK_THRESHOLD", 30.0)
     )
     medium_risk_threshold: float = field(
-        default_factory=lambda: _env_float("MEDIUM_RISK_THRESHOLD", 0.60)
+        default_factory=lambda: _env_threshold("MEDIUM_RISK_THRESHOLD", 60.0)
     )
     high_risk_threshold: float = field(
-        default_factory=lambda: _env_float("HIGH_RISK_THRESHOLD", 0.75)
+        default_factory=lambda: _env_threshold("HIGH_RISK_THRESHOLD", 80.0)
+    )
+    critical_risk_threshold: float = field(
+        default_factory=lambda: _env_threshold("CRITICAL_RISK_THRESHOLD", 80.0)
     )
     min_transcript_confidence: float = field(
         default_factory=lambda: _env_float("MIN_TRANSCRIPT_CONFIDENCE", 0.40)

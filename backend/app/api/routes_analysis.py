@@ -22,6 +22,11 @@ def get_conversation_manager() -> ConversationManager:
     return _default_conversation_manager
 
 
+def set_conversation_manager(manager: ConversationManager) -> None:
+    global _default_conversation_manager
+    _default_conversation_manager = manager
+
+
 @router.post("/analyze/transcript", response_model=ScamRiskAssessment)
 async def analyze_transcript(
     request: TranscriptAnalysisRequest,

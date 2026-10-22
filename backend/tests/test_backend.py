@@ -10,6 +10,7 @@ import json
 import unittest
 from typing import Dict, List
 
+from app.api.routes_analysis import get_conversation_manager, set_conversation_manager
 from app.api.routes_transcription import get_stt_provider
 from app.core.compat import LocalTestClient
 from app.core.config import Settings
@@ -55,6 +56,7 @@ class ScamCallBackendTestSuite(unittest.TestCase):
             keyword_sync_service=self.sync_service,
             settings=self.settings,
         )
+        set_conversation_manager(self.manager)
         self.app = create_app()
         self.client = LocalTestClient(self.app)
 
@@ -154,12 +156,12 @@ class ScamCallBackendTestSuite(unittest.TestCase):
             assessment = self.manager.analyze_standalone_transcript(
                 TranscriptAnalysisRequest(transcript=text, language_code=lang)
             )
-            self.assertEqual(
+            self.assertIn(
                 assessment.risk_level,
-                "HIGH",
-                f"Expected HIGH risk for multilingual scam sample ({lang}): {text}",
+                ("HIGH", "CRITICAL"),
+                f"Expected HIGH or CRITICAL risk for multilingual scam sample ({lang}): {text}",
             )
-            self.assertGreaterEqual(assessment.risk_score, 0.60)
+            self.assertGreaterEqual(assessment.risk_score, 60.0)
             self.assertIsNotNone(assessment.alert)
             self.assertTrue(assessment.alert.triggered)
 
@@ -203,7 +205,7 @@ class ScamCallBackendTestSuite(unittest.TestCase):
                 end_seconds=14.0,
             ),
         )
-        self.assertEqual(seg3.assessment.risk_level, "HIGH")
+        self.assertIn(seg3.assessment.risk_level, ("HIGH", "CRITICAL"))
         self.assertGreater(seg3.assessment.risk_score, seg1.assessment.risk_score)
 
         # Verify history contains all 3 segments and deduplicated indicators
@@ -402,7 +404,7 @@ class ScamCallBackendTestSuite(unittest.TestCase):
         )
         self.assertEqual(analyze_resp.status_code, 200)
         analyze_json = analyze_resp.json()
-        self.assertEqual(analyze_json["risk_level"], "HIGH")
+        self.assertIn(analyze_json["risk_level"], ("HIGH", "CRITICAL"))
         self.assertIsNone(analyze_json["p_scam"])
         self.assertTrue(analyze_json["alert"]["triggered"])
 
@@ -422,12 +424,12 @@ class ScamCallBackendTestSuite(unittest.TestCase):
         self.assertEqual(seg_resp.status_code, 200)
         seg_json = seg_resp.json()
         self.assertEqual(seg_json["call_id"], call_id)
-        self.assertEqual(seg_json["assessment"]["risk_level"], "HIGH")
+        self.assertIn(seg_json["assessment"]["risk_level"], ("HIGH", "CRITICAL"))
 
         # 5. GET /calls/{call_id}/risk
         risk_resp = self.client.get(f"/calls/{call_id}/risk")
         self.assertEqual(risk_resp.status_code, 200)
-        self.assertEqual(risk_resp.json()["risk_level"], "HIGH")
+        self.assertIn(risk_resp.json()["risk_level"], ("HIGH", "CRITICAL"))
 
         # 6. GET /calls/{call_id}/history
         hist_resp = self.client.get(f"/calls/{call_id}/history")
@@ -469,6 +471,177 @@ class ScamCallBackendTestSuite(unittest.TestCase):
         )
         self.assertTrue(df_res.enabled)
         self.assertTrue(df_res.is_suspected_deepfake)
+
+    # -------------------------------------------------------------------------
+    # 11. CLEARLY SUSPICIOUS CALLS & SCAM PATTERNS
+    # -------------------------------------------------------------------------
+    def test_11_clearly_suspicious_calls_and_all_scam_categories(self) -> None:
+        """Verifies high-risk scam patterns receive HIGH or CRITICAL scores with evidence."""
+        scam_patterns = [
+            # OTP / PIN theft
+            "Your account is locked. Please share the OTP and tell me your PIN immediately.",
+            # Reverse QR scan lure
+            "Sending you a QR code on WhatsApp, scan it and the money comes to your bank account.",
+            # AnyDesk remote screen share
+            "Download AnyDesk and share your screen to complete urgent server verification.",
+            # Digital Arrest / CBI extortion
+            "You are under digital arrest by CBI Mumbai. Non-bailable warrant issued against your Aadhaar.",
+            # Malicious Link / APK with coercion
+            "Your account will be suspended today, click this link or download the APK file right now.",
+        ]
+        for pattern in scam_patterns:
+            assessment = self.manager.analyze_standalone_transcript(
+                TranscriptAnalysisRequest(transcript=pattern, language_code="auto")
+            )
+            self.assertIn(
+                assessment.risk_level,
+                ("HIGH", "CRITICAL"),
+                f"Pattern should trigger HIGH/CRITICAL: {pattern}",
+            )
+            self.assertGreaterEqual(assessment.risk_score, 60.0)
+            self.assertTrue(assessment.alert.triggered)
+            self.assertGreater(len(assessment.evidence), 0)
+
+    # -------------------------------------------------------------------------
+    # 12. LEGITIMATE BANKING CONVERSATIONS AND PROTECTIVE ADVICE
+    # -------------------------------------------------------------------------
+    def test_12_legitimate_banking_queries_and_protective_advice(self) -> None:
+        """Ensures benign banking inquiries and scam-prevention advice are classified as LOW risk."""
+        legitimate_samples = [
+            "Hello, I want to check my account balance and get a mini statement.",
+            "Mera account balance kitna hai aur passbook update karwani hai.",
+            "Can you tell me how much interest I will earn on my fixed deposit?",
+            "Never share your OTP or UPI PIN with anyone, bank will never ask for your password.",
+            "Aapka UPI ID bhej do main payment kar deta hoon.",
+            "Please visit nearest branch with documents to update your address.",
+        ]
+        for sample in legitimate_samples:
+            assessment = self.manager.analyze_standalone_transcript(
+                TranscriptAnalysisRequest(transcript=sample, language_code="auto")
+            )
+            self.assertEqual(
+                assessment.risk_level,
+                "LOW",
+                f"Legitimate query must be LOW risk: {sample}",
+            )
+            self.assertLess(assessment.risk_score, 30.0)
+            self.assertFalse(assessment.alert.triggered)
+
+    # -------------------------------------------------------------------------
+    # 13. CODE-SWITCHING AND MULTILINGUAL DETECTION
+    # -------------------------------------------------------------------------
+    def test_13_code_switching_mixed_language_hinglish_punjabi(self) -> None:
+        """Tests mixed-language code-switching (Hindi, Punjabi, Hinglish, English)."""
+        code_switched_scams = [
+            # Hinglish
+            "Hello sir, your account block ho jayega, abhi turant AnyDesk download karo.",
+            # Punjabi + English
+            "Tuhade phone te OTP aaya hona, code dasso quickly to avoid arrest warrant.",
+            # Hindi Devanagari + English terms
+            "आरबीआई हेड ऑफिस से कॉल है, अपना यूपीआई पिन डालो पेमेंट रिसीव करने के लिए।",
+        ]
+        for text in code_switched_scams:
+            assessment = self.manager.analyze_standalone_transcript(
+                TranscriptAnalysisRequest(transcript=text, language_code="mixed")
+            )
+            self.assertIn(assessment.risk_level, ("HIGH", "CRITICAL"))
+            self.assertGreaterEqual(assessment.risk_score, 60.0)
+
+    # -------------------------------------------------------------------------
+    # 14. INSUFFICIENT TRANSCRIPTS & LOW CONFIDENCE RETURN UNKNOWN
+    # -------------------------------------------------------------------------
+    def test_14_insufficient_transcripts_and_low_confidence_return_unknown(self) -> None:
+        """Verifies short/ambiguous transcripts or low STT confidence return UNKNOWN."""
+        # Ultra-short ambiguous speech
+        short_res = self.manager.analyze_standalone_transcript(
+            TranscriptAnalysisRequest(transcript="Hi", language_code="en")
+        )
+        self.assertEqual(short_res.risk_level, "UNKNOWN")
+        self.assertEqual(short_res.risk_score, 0.0)
+
+        # Low transcription confidence (< min_transcript_confidence 0.40)
+        low_conf_res = self.manager.analyze_standalone_transcript(
+            TranscriptAnalysisRequest(
+                transcript="Share your OTP and UPI PIN immediately",
+                transcript_confidence=0.25,
+            )
+        )
+        self.assertEqual(low_conf_res.risk_level, "UNKNOWN")
+        self.assertIn("below minimum reliability threshold", low_conf_res.reasons[0])
+
+    # -------------------------------------------------------------------------
+    # 15. DYNAMIC RISK LEVEL ESCALATION ACROSS SEGMENTS (NO FROZEN SCORES)
+    # -------------------------------------------------------------------------
+    def test_15_dynamic_risk_level_escalation_across_segments(self) -> None:
+        """Verifies risk score dynamically updates as evidence accumulates rather than staying stuck."""
+        call_id = "call_dynamic_escalation_101"
+
+        # Segment 1: Harmless greeting -> LOW risk (score ~ 0)
+        s1 = self.manager.process_segment(
+            call_id,
+            CallSegmentRequest(text="Good afternoon, is this Mr. Sharma?", start_seconds=0.0, end_seconds=3.0),
+        )
+        self.assertEqual(s1.assessment.risk_level, "LOW")
+        self.assertEqual(s1.assessment.risk_score, 0.0)
+
+        # Segment 2: Authority claim -> MEDIUM risk (score ~ 30-40)
+        s2 = self.manager.process_segment(
+            call_id,
+            CallSegmentRequest(text="I am calling from Bank Head Office vigilance department.", start_seconds=3.0, end_seconds=7.0),
+        )
+        self.assertGreater(s2.assessment.risk_score, s1.assessment.risk_score)
+        self.assertIn(s2.assessment.risk_level, ("LOW", "MEDIUM"))
+
+        # Segment 3: Threat of account freeze -> HIGH risk (score ~ 60-75)
+        s3 = self.manager.process_segment(
+            call_id,
+            CallSegmentRequest(text="Your account will be suspended and khata band ho jayega today.", start_seconds=7.0, end_seconds=11.0),
+        )
+        self.assertGreater(s3.assessment.risk_score, s2.assessment.risk_score)
+        self.assertIn(s3.assessment.risk_level, ("MEDIUM", "HIGH"))
+
+        # Segment 4: OTP theft solicitation -> CRITICAL risk (score >= 80)
+        s4 = self.manager.process_segment(
+            call_id,
+            CallSegmentRequest(text="SMS mein 6 digit OTP aaya hai, tell me the OTP quickly abhi batao.", start_seconds=11.0, end_seconds=16.0),
+        )
+        self.assertGreater(s4.assessment.risk_score, s3.assessment.risk_score)
+        self.assertEqual(s4.assessment.risk_level, "CRITICAL")
+        self.assertGreaterEqual(s4.assessment.risk_score, 80.0)
+
+    # -------------------------------------------------------------------------
+    # 16. DUPLICATE SEGMENTS AND RETRY SUPPRESSION
+    # -------------------------------------------------------------------------
+    def test_16_duplicate_segment_and_network_retry_handling(self) -> None:
+        """Verifies duplicate segments sent via network retries are handled safely."""
+        call_id = "call_dedup_test_202"
+        seg = CallSegmentRequest(
+            text="Please enter your UPI PIN to claim lottery prize.",
+            speaker="caller",
+            start_seconds=1.0,
+            end_seconds=4.0,
+        )
+        first_resp = self.manager.process_segment(call_id, seg)
+        first_score = first_resp.assessment.risk_score
+
+        # Resend identical segment (retry)
+        dup_resp = self.manager.process_segment(call_id, seg)
+        self.assertEqual(dup_resp.assessment.risk_score, first_score)
+        self.assertGreaterEqual(dup_resp.duplicate_evidence_suppressed, 1)
+
+    # -------------------------------------------------------------------------
+    # 17. API AND PROVIDER FAILURE RESILIENCE
+    # -------------------------------------------------------------------------
+    def test_17_api_and_provider_failure_resilience(self) -> None:
+        """Verifies system handles AI timeouts and malformed responses gracefully."""
+        # Simulated broken LLM
+        def broken_llm(_text: str, _hist: List[str]) -> str:
+            return "NOT_VALID_JSON_AT_ALL_<<<>>>"
+
+        analyzer = ContextualAnalyzer(settings=self.settings, llm_callable=broken_llm)
+        out = analyzer.analyze("Some text here")
+        self.assertEqual(out.service_status, "MALFORMED_OUTPUT")
+        self.assertEqual(out.intent_risk_score, 0.0)
 
 
 if __name__ == "__main__":

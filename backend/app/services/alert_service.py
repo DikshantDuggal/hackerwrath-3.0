@@ -20,33 +20,46 @@ class AlertService:
     ) -> AlertPayload:
         alert_id = f"alt_{uuid.uuid4().hex[:10]}"
 
-        if risk_level == "HIGH":
+        if risk_level in ("HIGH", "CRITICAL"):
             categories = {i.category for i in indicators}
+            is_critical = (risk_level == "CRITICAL" or risk_score >= 80.0)
+            prefix = "Critical" if is_critical else "High-Risk"
+
             if "QR_SCAN_TO_RECEIVE_MONEY" in categories:
-                headline = "High-Risk Payment Pattern: Caller asked you to scan a QR code to receive money"
+                headline = f"{prefix} Payment Scam Warning: Caller asked you to scan a QR code to receive money"
                 safe_action = (
-                    "End the call. Scanning a QR code or entering a UPI PIN sends money from your account—it is never required to receive money."
+                    "End the call immediately. Scanning a QR code or entering a UPI PIN sends money from your account—it is never required to receive money."
                 )
             elif "OTP_OR_PIN_REQUEST" in categories:
-                headline = "High-Risk Credential Request: Caller asked for an OTP, UPI PIN, or password"
+                headline = f"{prefix} Credential Theft Alert: Caller asked for an OTP, UPI PIN, or password"
                 safe_action = (
-                    "Do not share any OTP, UPI PIN, CVV, or password on the call. Hang up and verify directly via your official banking app."
+                    "Never share any OTP, UPI PIN, CVV, or password. Disconnect the call immediately and contact your official bank branch."
                 )
             elif "REMOTE_ACCESS_OR_SCREEN_SHARE" in categories:
-                headline = "High-Risk Device Access Request: Caller asked for screen sharing or remote control"
+                headline = f"{prefix} Device Takeover Request: Caller asked for screen sharing or remote control"
                 safe_action = (
-                    "Do not install AnyDesk, TeamViewer, or share your screen during a financial call. Disconnect immediately."
+                    "Do not install AnyDesk, TeamViewer, or share your screen. Disconnect immediately."
+                )
+            elif "SUSPICIOUS_LINK_OR_APK" in categories:
+                headline = f"{prefix} Malicious Link / APK Warning: Caller asked to open link or install APK"
+                safe_action = (
+                    "Do not click links or install APKs sent during calls. Disconnect immediately."
+                )
+            elif "THREAT_ARREST_OR_LEGAL_ACTION" in categories:
+                headline = f"{prefix} Legal Threat / Extortion: Digital Arrest or Police/CBI Threat"
+                safe_action = (
+                    "Hang up immediately. Law enforcement, CBI, and courts never conduct arrests or demand money over phone or video calls."
                 )
             else:
-                headline = "High-Risk Coercive or Impersonation Pattern Detected"
+                headline = f"{prefix} Coercive or Impersonation Pattern Detected"
                 safe_action = (
-                    "Hang up and verify the claim independently using an official helpline number. Government and bank officials never conduct arrests or demand fees over calls."
+                    "Hang up and verify independently using official helplines. Legitimate organizations never demand immediate money or secret codes over calls."
                 )
 
             return AlertPayload(
                 alert_id=alert_id,
                 triggered=True,
-                severity="CRITICAL",
+                severity="CRITICAL" if is_critical else "WARNING",
                 headline=headline,
                 safe_action=safe_action,
             )

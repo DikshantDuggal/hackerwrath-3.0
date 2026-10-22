@@ -9,7 +9,7 @@ export interface TranscriptSegment {
 
 export interface RiskAssessment {
   risk_score: number;
-  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNKNOWN';
   confidence: number | null;
   caption: string;
   reasons: string[];

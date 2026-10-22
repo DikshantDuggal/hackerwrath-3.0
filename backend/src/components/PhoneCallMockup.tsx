@@ -102,7 +102,7 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk }: PhoneC
         const assessment = await onAnalyzeSegment(seg.text);
         if (assessment) {
           setSimulatedRisk(assessment);
-          if (assessment.risk_level === 'HIGH') {
+          if (assessment.risk_level === 'HIGH' || assessment.risk_level === 'CRITICAL') {
             audioAlerts.playHighRiskAlert();
           } else if (assessment.risk_level === 'MEDIUM') {
             audioAlerts.playCautionAlert();
@@ -130,7 +130,7 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk }: PhoneC
   };
 
   const effectiveRisk = simulatedRisk || activeRisk;
-  const isHighRisk = effectiveRisk?.risk_level === 'HIGH';
+  const isHighRisk = effectiveRisk?.risk_level === 'HIGH' || effectiveRisk?.risk_level === 'CRITICAL';
   const isMedRisk = effectiveRisk?.risk_level === 'MEDIUM';
 
   return (

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 interface AstraOrbitalCanvasProps {
-  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNKNOWN';
   isListening?: boolean;
   audioLevel?: number; // 0 to 1
 }
@@ -75,6 +75,13 @@ export default function AstraOrbitalCanvas({
         cubeColors: ['#ef4444', '#f87171', '#dc2626', '#fb7185'],
         ringStroke: 'rgba(239, 68, 68, 0.22)',
         flameCore: '#fee2e2',
+      },
+      CRITICAL: {
+        coreGlow: 'rgba(255, 45, 85, 0.75)', // Crimson Emergency Alert
+        ambientGlow: 'rgba(239, 68, 68, 0.4)',
+        cubeColors: ['#ff2d55', '#ef4444', '#dc2626', '#e11d48'],
+        ringStroke: 'rgba(255, 45, 85, 0.35)',
+        flameCore: '#ffe4e6',
       },
       UNKNOWN: {
         coreGlow: 'rgba(147, 128, 185, 0.25)',

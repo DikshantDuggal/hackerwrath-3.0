@@ -26,6 +26,7 @@ class CallSegmentRecord(BaseModel):
     language_code: str
     start_seconds: float
     end_seconds: float
+    text: str = ""
     transcript_confidence: float
     detected_indicators: List[str] = Field(default_factory=list)
     risk_level_at_segment: RiskLevelType = "LOW"
@@ -73,7 +74,7 @@ class KeywordSyncUpdateRequest(BaseModel):
 
     keyword: str = Field(min_length=2)
     category: str = Field(default="OTP_OR_PIN_REQUEST")
-    weight: float = Field(default=0.30, ge=0.05, le=1.0)
+    weight: float = Field(default=30.0, ge=0.0, le=100.0)
     source_call_id: Optional[str] = None
 
 
