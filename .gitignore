@@ -20,3 +20,12 @@ KEYS_GUIDE.txt
 KEYS_CONFIGURATION.txt
 KEYS_REQUIRED.txt
 node_modules/
+
+# RAG Large Data & Vector Store Binaries
+**/data/*.jsonl
+**/vector_store/*.npz
+**/vector_store/*.joblib
+**/vector_store/*.jsonl
+**/vector_store/chroma/
+!**/data/data_quality_report.json
+!**/vector_store/evaluation_report.json

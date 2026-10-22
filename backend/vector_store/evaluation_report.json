@@ -1,0 +1,88 @@
+{
+  "dataset": {
+    "test_size": 1424,
+    "scam_count": 525,
+    "legit_count": 899
+  },
+  "system_1_tfidf_baseline": {
+    "accuracy": 0.9993,
+    "macro_f1": 0.9992,
+    "scam_metrics": {
+      "precision": 1.0,
+      "recall": 0.9981,
+      "f1": 0.999
+    },
+    "legitimate_metrics": {
+      "precision": 0.9989,
+      "recall": 1.0,
+      "f1": 0.9994
+    },
+    "confusion_matrix": {
+      "true_negatives_legit": 899,
+      "false_positives_scam": 0,
+      "false_negatives_legit": 1,
+      "true_positives_scam": 524
+    },
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0019,
+    "avg_latency_ms": 0.173
+  },
+  "system_2_rag_classifier": {
+    "accuracy": 0.9937,
+    "macro_f1": 0.9932,
+    "scam_metrics": {
+      "precision": 0.985,
+      "recall": 0.9981,
+      "f1": 0.9915
+    },
+    "legitimate_metrics": {
+      "precision": 0.9989,
+      "recall": 0.9911,
+      "f1": 0.995
+    },
+    "confusion_matrix": {
+      "true_negatives_legit": 891,
+      "false_positives_scam": 8,
+      "false_negatives_legit": 1,
+      "true_positives_scam": 524
+    },
+    "false_positive_rate": 0.0089,
+    "false_negative_rate": 0.0019,
+    "avg_inference_latency_ms": 41.42,
+    "avg_retrieval_latency_ms": 41.05
+  },
+  "targeted_probes": [
+    {
+      "probe_id": "Probe_Protective",
+      "text": "Never share your OTP with anyone. Our bank representatives never ask for it.",
+      "expected": "LEGITIMATE",
+      "predicted": "LEGITIMATE",
+      "risk_score": 0.0,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_Solicitation",
+      "text": "Tell me the OTP you just received right now so I can verify your account.",
+      "expected": "SCAM",
+      "predicted": "SCAM",
+      "risk_score": 100.0,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_AuthNotice",
+      "text": "Your OTP for login is 492018. Valid for 10 minutes. Do not share.",
+      "expected": "LEGITIMATE",
+      "predicted": "LEGITIMATE",
+      "risk_score": 0.0,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_UrgentFreeze",
+      "text": "Your bank account has been blocked immediately. Transfer 5000 to unfreeze.",
+      "expected": "SCAM",
+      "predicted": "SCAM",
+      "risk_score": 100.0,
+      "passed": true
+    }
+  ]
+}
