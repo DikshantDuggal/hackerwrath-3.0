@@ -40,9 +40,12 @@ def create_app() -> FastAPI:
 
     # Mount compiled frontend dist if available so http://127.0.0.1:8000 serves the UI directly
     dist_dir = Path(__file__).resolve().parent.parent / "dist"
+    assets_dir = dist_dir / "assets"
     if dist_dir.exists() and (dist_dir / "index.html").exists():
         try:
             from fastapi.staticfiles import StaticFiles
+            if assets_dir.exists():
+                application.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
             application.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="static")
         except Exception:
             pass
