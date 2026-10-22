@@ -1,0 +1,10 @@
+{
+  "name": "Edgerunners Live Scam Protection",
+  "description": "Real-time in-call payment scam protection for marketplace sellers across English, Hindi, and Punjabi using LiveKit WebRTC, fast phrase detection, and Sarvam-105B policy verification.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
