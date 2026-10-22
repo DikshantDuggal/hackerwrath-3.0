@@ -87,6 +87,12 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     ("visit your branch with documents", "Legitimate branch visit guidance"),
     ("branch aakar kyc karwa lijiye", "Legitimate guidance to visit branch in person"),
     ("atm jaakar pin change karein", "Legitimate advice to use official ATM for PIN change"),
+    # Automated system OTP delivery and transaction notifications (inbound, non-solicitation)
+    ("your otp for logging into your account is", "Automated system OTP delivery notification"),
+    ("your otp for logging in is", "Automated system OTP delivery notification"),
+    ("your otp for transaction is", "Automated system OTP delivery notification"),
+    ("your one time password is", "Automated system OTP delivery notification"),
+    ("is your secret otp", "Automated system OTP delivery notification"),
 )
 
 
@@ -120,6 +126,21 @@ REGEX_QR_LURE = re.compile(
 
 REGEX_LEGAL_THREAT = re.compile(
     r"\b(digital arrest|arrest warrant|non bailable|cbi|police station|narcotics bureau|crime branch|cyber crime|fir filed|customs seizure)\b",
+    re.IGNORECASE,
+)
+
+REGEX_URGENT_PAYMENT = re.compile(
+    r"\b(transfer|send|pay|deposit|bhejo|jama karo|transfer karo)\b.*?\b(money|paise|funds|amount|deposit|fee|charge|account)\b"
+    r"|\b(money|paise|funds|fee)\b.*?\b(transfer|send|pay|deposit|bhejo|jama)\b"
+    r"|(?:पैसे|रुपये|राशि).*(?:ट्रांसफर|भेजो|डालो|पे|जमा)|(?:ट्रांसफर|भेजो|डालो|पे|जमा).*(?:पैसे|रुपये|राशि)",
+    re.IGNORECASE,
+)
+
+REGEX_URGENCY_PRESSURE = re.compile(
+    r"\b(?:within|in)\s+\d+\s+(?:minute|minutes|min|mins|second|seconds|ghante|ghanta)\b"
+    r"|\b\d+\s+(?:minute|min|ghante)\s+(?:ke andar|mein)\b"
+    r"|\b(?:immediately|right now|turant|jaldi|urgent|urgently|warna|otherwise|unless you)\b"
+    r"|(?:तुरंत|जल्दी|वरना|\d+\s*मिनट के अंदर)",
     re.IGNORECASE,
 )
 
@@ -287,11 +308,19 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
         rule_id="RULE_URGENT_PAYMENT_DEMAND",
         category="URGENT_PAYMENT_DEMAND",
         pattern_label="urgent_payment_or_fee",
+        regex=REGEX_URGENT_PAYMENT,
         phrases=(
             "pay the processing fee immediately",
             "transfer the security deposit now",
             "pay customs duty right now",
             "refundable verification charge",
+            "transfer money to this account",
+            "transfer money",
+            "transfer the money",
+            "send money to this account",
+            "send money",
+            "pay money",
+            "deposit money",
             "abhi turant paise bhejo",
             "processing fee jama karo",
             "turant transfer karo",
@@ -305,11 +334,19 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
         rule_id="RULE_PRESSURE_TACTICS",
         category="PRESSURE_AND_SECRECY_TACTIC",
         pattern_label="urgency_or_secrecy_pressure",
+        regex=REGEX_URGENCY_PRESSURE,
         phrases=(
             "do not disconnect the call",
             "don't tell anyone",
             "tell me the code quickly",
             "do it within 2 minutes",
+            "in 5 minutes",
+            "within 5 minutes",
+            "in 10 minutes",
+            "right now",
+            "immediately",
+            "unless you transfer",
+            "warna account",
             "jaldi batao",
             "call mat kaatna",
             "kisi ko mat batana",

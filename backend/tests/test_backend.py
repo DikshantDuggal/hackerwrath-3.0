@@ -930,6 +930,130 @@ class ScamCallBackendTestSuite(unittest.TestCase):
         except (ImportError, Exception):
             pass
 
+    # -------------------------------------------------------------------------
+    # 27. CONTEXTUAL EVALUATION OF STATEMENTS A TO F (Scam vs Legitimate vs Threat)
+    # -------------------------------------------------------------------------
+    def test_27_contextual_evaluation_of_statements_a_to_f(self) -> None:
+        """
+        Validates the 6 explicit benchmark statements from the ScamShield AI requirements:
+        Statement A: 'Never share your OTP with anyone.' -> Protective advice (LOW).
+        Statement B: 'Tell me the OTP you just received so I can verify your bank account.' -> Credential theft (HIGH/CRITICAL).
+        Statement C: 'Your OTP for logging into your account is 123456.' -> Inbound notification (LOW).
+        Statement D: 'Your account will be blocked in 5 minutes unless you transfer money to this account.' -> Coercion + urgency + money (CRITICAL).
+        Statement E: 'Hi Mom, I am on my way home, please make dinner.' -> Benign family talk (LOW).
+        Statement F: 'Hi Mom, send me the OTP you just received on your phone right now.' -> Credential solicitation evaluated on actual request, not relationship (HIGH/CRITICAL).
+        """
+        scenarios = {
+            "A": {
+                "text": "Never share your OTP with anyone.",
+                "expected_level": "LOW",
+                "max_score": 29.0,
+            },
+            "B": {
+                "text": "Tell me the OTP you just received so I can verify your bank account.",
+                "expected_level": ("HIGH", "CRITICAL"),
+                "min_score": 60.0,
+            },
+            "C": {
+                "text": "Your OTP for logging into your account is 123456.",
+                "expected_level": "LOW",
+                "max_score": 29.0,
+            },
+            "D": {
+                "text": "Your account will be blocked in 5 minutes unless you transfer money to this account.",
+                "expected_level": "CRITICAL",
+                "min_score": 80.0,
+            },
+            "E": {
+                "text": "Hi Mom, I am on my way home, please make dinner.",
+                "expected_level": "LOW",
+                "max_score": 29.0,
+            },
+            "F": {
+                "text": "Hi Mom, send me the OTP you just received on your phone right now.",
+                "expected_level": ("HIGH", "CRITICAL"),
+                "min_score": 60.0,
+            },
+        }
+
+        for stmt_id, spec in scenarios.items():
+            r_res, _ = self.rules_engine.evaluate(spec["text"])
+            c_res = self.contextual_analyzer.analyze(spec["text"])
+            assessment = self.risk_scorer.score(
+                rule_result=r_res,
+                contextual_result=c_res,
+            )
+
+            expected_level = spec["expected_level"]
+            if isinstance(expected_level, tuple):
+                self.assertIn(
+                    assessment.risk_level,
+                    expected_level,
+                    f"Statement {stmt_id} ('{spec['text']}') expected level in {expected_level}, got {assessment.risk_level} (score {assessment.risk_score})"
+                )
+            else:
+                self.assertEqual(
+                    assessment.risk_level,
+                    expected_level,
+                    f"Statement {stmt_id} ('{spec['text']}') expected level {expected_level}, got {assessment.risk_level} (score {assessment.risk_score})"
+                )
+
+            if "max_score" in spec:
+                self.assertLessEqual(
+                    assessment.risk_score,
+                    spec["max_score"],
+                    f"Statement {stmt_id} score {assessment.risk_score} exceeded max {spec['max_score']}"
+                )
+            if "min_score" in spec:
+                self.assertGreaterEqual(
+                    assessment.risk_score,
+                    spec["min_score"],
+                    f"Statement {stmt_id} score {assessment.risk_score} was below min {spec['min_score']}"
+                )
+
+    # -------------------------------------------------------------------------
+    # 28. TELEGRAM IDENTITY SYNC AND DYNAMIC CHAT ID CONFIGURATION
+    # -------------------------------------------------------------------------
+    def test_28_telegram_sync_and_set_chat_id(self) -> None:
+        """Verifies Telegram identity sync and manual/discovered chat ID binding."""
+        tg_settings = Settings(
+            telegram_bot_token="8791679803:AAGrWVK7nuGRV4b1qNc3aHkIt6qT-D_nlhU",
+            telegram_chat_id="",
+            telegram_alerts_enabled=True,
+        )
+
+        def mock_transport(method: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+            if method == "getMe":
+                return {"ok": True, "result": {"id": 8791679803, "username": "EdgingToRunner_bot"}}
+            if method == "getUpdates":
+                return {
+                    "ok": True,
+                    "result": [
+                        {
+                            "update_id": 1001,
+                            "message": {
+                                "message_id": 1,
+                                "chat": {"id": 12345678, "first_name": "TestUser"},
+                                "text": "/start",
+                            },
+                        }
+                    ],
+                }
+            return {"ok": True, "result": {"message_id": 99}}
+
+        service = TelegramAlertService(settings=tg_settings, http_transport=mock_transport)
+        sync_res = service.sync_bot_identity()
+        self.assertTrue(sync_res["ok"])
+        self.assertEqual(sync_res["bot_username"], "EdgingToRunner_bot")
+        self.assertEqual(sync_res["chat_id"], "12345678")
+        self.assertTrue(service.is_configured)
+
+        # Test setting chat ID manually
+        set_res = service.set_chat_id("888999111")
+        self.assertTrue(set_res["ok"])
+        self.assertEqual(tg_settings.telegram_chat_id, "888999111")
+        self.assertEqual(service.get_status().status, "CONNECTED")
+
 
 if __name__ == "__main__":
     unittest.main()

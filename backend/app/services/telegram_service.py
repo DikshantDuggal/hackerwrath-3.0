@@ -318,6 +318,83 @@ class TelegramAlertService:
             data = json.loads(resp.read().decode("utf-8"))
             return data
 
+    def sync_bot_identity(self) -> Dict[str, Any]:
+        """
+        Queries official Telegram Bot API (getMe, getUpdates) to discover bot identity
+        and automatically detect the user's chat_id if not yet configured.
+        """
+        if not self.settings.has_live_telegram_token:
+            return {
+                "ok": False,
+                "configured": False,
+                "bot_username": None,
+                "chat_id": None,
+                "detail": "Telegram bot token is not configured in environment.",
+            }
+
+        try:
+            if self.http_transport is not None:
+                me_resp = self.http_transport("getMe", {})
+            else:
+                me_resp = self._dispatch_http_request("getMe", {})
+
+            if me_resp.get("ok"):
+                self._bot_username = me_resp.get("result", {}).get("username")
+
+            # Try to auto-discover chat_id if not yet set
+            discovered_chat_id = None
+            if not self.settings.telegram_chat_id:
+                if self.http_transport is not None:
+                    upd_resp = self.http_transport("getUpdates", {"limit": 10})
+                else:
+                    upd_resp = self._dispatch_http_request("getUpdates", {"limit": 10})
+
+                updates = upd_resp.get("result", [])
+                for upd in reversed(updates):
+                    msg = upd.get("message") or upd.get("channel_post") or {}
+                    chat = msg.get("chat") or {}
+                    cid = chat.get("id")
+                    if cid:
+                        discovered_chat_id = str(cid)
+                        self.settings.telegram_chat_id = discovered_chat_id
+                        logger.info("Discovered Telegram chat_id '%s'", discovered_chat_id)
+                        break
+
+            return {
+                "ok": True,
+                "configured": self.is_configured,
+                "bot_username": self._bot_username,
+                "chat_id": self.settings.telegram_chat_id,
+                "detail": (
+                    f"Connected to @{self._bot_username} (Chat ID: {self.settings.telegram_chat_id})"
+                    if self.settings.telegram_chat_id
+                    else f"Bot @{self._bot_username} is active. Send /start to @{self._bot_username} in Telegram to link your chat ID."
+                ),
+            }
+        except Exception as exc:
+            err = str(exc)
+            logger.warning("Failed to sync bot identity: %s", err)
+            self._last_error = err
+            return {
+                "ok": False,
+                "configured": False,
+                "bot_username": self._bot_username,
+                "chat_id": self.settings.telegram_chat_id,
+                "detail": f"Failed to connect to Telegram: {err}",
+            }
+
+    def set_chat_id(self, chat_id: str) -> Dict[str, Any]:
+        """Manually sets the target Telegram chat ID for notifications."""
+        cid = str(chat_id).strip()
+        self.settings.telegram_chat_id = cid
+        return {
+            "ok": True,
+            "configured": self.is_configured,
+            "chat_id": self.settings.telegram_chat_id,
+            "bot_username": self._bot_username,
+            "detail": f"Telegram chat ID set to '{cid}'.",
+        }
+
     def handle_webhook_update(self, update_payload: Dict[str, Any]) -> TelegramCommandResponse:
         """
         Processes incoming updates from Telegram Webhook with access control validation.

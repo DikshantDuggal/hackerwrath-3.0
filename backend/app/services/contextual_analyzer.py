@@ -18,7 +18,12 @@ from app.schemas.analysis import (
     ContextualAIWireSchema,
     ContextualAnalysisOutput,
 )
-from app.services.rules_engine import normalise_text
+from app.services.rules_engine import (
+    REGEX_OTP_SOLICITATION,
+    REGEX_URGENT_PAYMENT,
+    REGEX_URGENCY_PRESSURE,
+    normalise_text,
+)
 
 logger = get_logger("scam_detector.contextual_analyzer")
 
@@ -272,37 +277,45 @@ class ContextualAnalyzer:
 
         # Detect scam solicitations
         asks_for_otp_or_pin = (
-            any(
-                p in norm
-                for p in (
-                    "tell me the code",
-                    "tell me the otp",
-                    "share the otp",
-                    "share your otp",
-                    "share the code",
-                    "otp batao",
-                    "otp bata do",
-                    "code batao",
-                    "code bata do",
-                    "bhejo otp",
-                    "otp bhej do",
-                    "mainu dasso",
-                    "otp dasso",
-                    "code dasso",
-                    "otp dass",
-                    "code dass",
-                    "pin dasso",
-                    "upi pin daal",
-                    "pin daalo",
-                    "pin daal do",
-                    "enter your upi pin",
-                    "enter your pin",
-                    "tell me your cvv",
-                    "share your password",
-                    "ओटीपी बताओ",
-                    "पिन डालो",
-                    "ਓਟੀਪੀ ਦੱਸੋ",
-                    "ਪਿੰਨ ਪਾਓ",
+            (
+                bool(REGEX_OTP_SOLICITATION.search(norm))
+                or any(
+                    p in norm
+                    for p in (
+                        "tell me the code",
+                        "tell me the otp",
+                        "share the otp",
+                        "share your otp",
+                        "share the code",
+                        "send me the otp",
+                        "send me otp",
+                        "send the otp",
+                        "give me the otp",
+                        "give me your otp",
+                        "otp batao",
+                        "otp bata do",
+                        "code batao",
+                        "code bata do",
+                        "bhejo otp",
+                        "otp bhej do",
+                        "mainu dasso",
+                        "otp dasso",
+                        "code dasso",
+                        "otp dass",
+                        "code dass",
+                        "pin dasso",
+                        "upi pin daal",
+                        "pin daalo",
+                        "pin daal do",
+                        "enter your upi pin",
+                        "enter your pin",
+                        "tell me your cvv",
+                        "share your password",
+                        "ओटीपी बताओ",
+                        "पिन डालो",
+                        "ਓਟੀਪੀ ਦੱਸੋ",
+                        "ਪਿੰਨ ਪਾਓ",
+                    )
                 )
             )
             and not is_protective_otp
@@ -406,16 +419,26 @@ class ContextualAnalyzer:
             if current_text[:180] not in excerpts:
                 excerpts.append(current_text[:180])
 
-        has_urgent_payment = any(
-            p in norm
-            for p in (
-                "pay the processing fee",
-                "transfer the security deposit",
-                "abhi turant paise bhejo",
-                "processing fee jama karo",
-                "turant transfer karo",
-                "तुरंत पैसे भेजो",
-                "ਹੁਣੇ ਪੈਸੇ ਭੇਜੋ",
+        has_urgent_payment = (
+            bool(REGEX_URGENT_PAYMENT.search(norm))
+            or any(
+                p in norm
+                for p in (
+                    "pay the processing fee",
+                    "transfer the security deposit",
+                    "transfer money to this account",
+                    "transfer money",
+                    "transfer the money",
+                    "send money to this account",
+                    "send money",
+                    "pay money",
+                    "deposit money",
+                    "abhi turant paise bhejo",
+                    "processing fee jama karo",
+                    "turant transfer karo",
+                    "तुरंत पैसे भेजो",
+                    "ਹੁਣੇ ਪੈਸੇ ਭੇਜੋ",
+                )
             )
         )
         if has_urgent_payment:
@@ -424,19 +447,29 @@ class ContextualAnalyzer:
             if current_text[:180] not in excerpts:
                 excerpts.append(current_text[:180])
 
-        has_pressure_or_secrecy = any(
-            p in norm
-            for p in (
-                "do not disconnect the call",
-                "don't tell anyone",
-                "call mat kaatna",
-                "kisi ko mat batana",
-                "jaldi batao",
-                "alert band karo",
-                "कॉल मत काटना",
-                "जल्दी बताओ",
-                "ਕਾਲ ਨਾ ਕੱਟੋ",
-                "ਜਲਦੀ ਦੱਸੋ",
+        has_pressure_or_secrecy = (
+            bool(REGEX_URGENCY_PRESSURE.search(norm))
+            or any(
+                p in norm
+                for p in (
+                    "do not disconnect the call",
+                    "don't tell anyone",
+                    "in 5 minutes",
+                    "within 5 minutes",
+                    "in 10 minutes",
+                    "right now",
+                    "immediately",
+                    "unless you transfer",
+                    "warna account",
+                    "call mat kaatna",
+                    "kisi ko mat batana",
+                    "jaldi batao",
+                    "alert band karo",
+                    "कॉल मत काटना",
+                    "जल्दी बताओ",
+                    "ਕਾਲ ਨਾ ਕੱਟੋ",
+                    "ਜਲਦੀ ਦੱਸੋ",
+                )
             )
         )
         if has_pressure_or_secrecy:

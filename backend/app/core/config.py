@@ -8,9 +8,15 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, List
 
+from pathlib import Path
+
 try:
     from dotenv import load_dotenv  # type: ignore
-    load_dotenv()
+    _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path)
+    else:
+        load_dotenv()
 except ImportError:
     pass
 
@@ -205,6 +211,14 @@ class Settings:
                 "SARVAM_API_KEY_PLACEHOLDER",
                 "MY_SARVAM_API_KEY",
             )
+        )
+
+    @property
+    def has_live_telegram_token(self) -> bool:
+        token = (self.telegram_bot_token or "").strip()
+        return bool(
+            token
+            and token not in ("YOUR_TELEGRAM_BOT_TOKEN_HERE", "PLACEHOLDER")
         )
 
     @property

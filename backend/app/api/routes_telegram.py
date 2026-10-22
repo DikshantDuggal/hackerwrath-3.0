@@ -25,6 +25,29 @@ async def get_telegram_status(
     return service.get_status()
 
 
+@router.get("/sync")
+@router.post("/sync")
+async def sync_telegram_identity(
+    service: TelegramAlertService = Depends(get_telegram_service),
+) -> Dict[str, Any]:
+    """
+    Syncs bot identity with Telegram API and auto-discovers chat_id from recent messages.
+    """
+    return service.sync_bot_identity()
+
+
+@router.post("/set-chat-id")
+async def set_telegram_chat_id(
+    payload: Dict[str, str],
+    service: TelegramAlertService = Depends(get_telegram_service),
+) -> Dict[str, Any]:
+    """Manually configures or updates the target Telegram Chat ID."""
+    chat_id = payload.get("chat_id", "").strip()
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="Missing or empty 'chat_id' in payload.")
+    return service.set_chat_id(chat_id)
+
+
 @router.post("/alert", response_model=TelegramSendAlertResponse)
 async def send_manual_alert(
     request: TelegramSendAlertRequest,
