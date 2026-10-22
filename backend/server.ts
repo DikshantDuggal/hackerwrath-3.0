@@ -68,7 +68,7 @@ async function startServer(): Promise<void> {
   const app = express();
 
   // Forward all backend API routes to the Python FastAPI service
-  app.use(['/health', '/transcribe', '/analyze', '/calls', '/sync'], (req, res) => {
+  app.use(['/health', '/transcribe', '/analyze', '/calls', '/sync', '/telegram'], (req, res) => {
     proxyToPython(req, res);
   });
 
