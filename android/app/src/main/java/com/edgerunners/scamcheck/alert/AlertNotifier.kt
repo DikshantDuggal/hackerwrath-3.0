@@ -106,6 +106,7 @@ class AlertNotifier(private val context: Context) {
             RequestType.QrReceive -> res.getString(R.string.alert_qr_title) to res.getString(R.string.alert_receive_body)
             RequestType.PinReceive -> res.getString(R.string.alert_pin_title) to res.getString(R.string.alert_receive_body)
             RequestType.OtpShare -> res.getString(R.string.alert_otp_title) to res.getString(R.string.alert_otp_body)
+            RequestType.RemoteAccess -> res.getString(R.string.alert_remote_title) to res.getString(R.string.alert_remote_body)
         }
     }
 }

@@ -449,6 +449,7 @@ private fun DayStory(day: DayTally, isToday: Boolean, locale: Locale) {
                     RequestType.QrReceive -> R.string.sb_day_qr
                     RequestType.PinReceive -> R.string.sb_day_pin
                     RequestType.OtpShare -> R.string.sb_day_otp
+                    RequestType.RemoteAccess -> R.string.sb_day_remote
                 }
             ),
             style = TextStyle(fontSize = 19.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold),

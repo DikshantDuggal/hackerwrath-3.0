@@ -4,6 +4,7 @@ import com.edgerunners.scamcheck.data.AppEvent
 import com.edgerunners.scamcheck.model.EndReason
 import com.edgerunners.scamcheck.model.RequestType
 import com.edgerunners.scamcheck.model.RiskLevel
+import com.edgerunners.scamcheck.model.ThreatSignal
 
 enum class CallPhase { Idle, Ringing, InCall, Ended }
 
@@ -15,6 +16,8 @@ data class ActiveAlert(
     val type: RequestType,
     val level: RiskLevel,
     val confirmed: Boolean,
+    /** "What they said" chips. Shown only; the level comes from the event alone. */
+    val signals: List<ThreatSignal> = emptyList(),
 )
 
 data class CallUiState(
@@ -148,7 +151,11 @@ object AlertReducer {
     private fun onFirstWarning(state: CallUiState, event: AppEvent.FirstWarning, nowMs: Long): Reduction {
         if (state.phase != CallPhase.InCall) return Reduction(state)
         val sameAlert = state.alert?.id == event.alertId
-        val alert = if (sameAlert) state.alert!! else ActiveAlert(event.alertId, event.requestType, RiskLevel.Possible, confirmed = false)
+        val alert = if (sameAlert) {
+            state.alert!!
+        } else {
+            ActiveAlert(event.alertId, event.requestType, RiskLevel.Possible, confirmed = false, signals = event.signals)
+        }
         val lastChime = state.lastChimeAtMs[event.requestType]
         val chime = !sameAlert && (lastChime == null || nowMs - lastChime >= CHIME_WINDOW_MS)
         val next = state.copy(
@@ -170,7 +177,7 @@ object AlertReducer {
         val unchanged = previous != null && previous.confirmed && previous.id == event.alertId &&
             previous.level == event.level && previous.type == event.requestType
         val next = state.copy(
-            alert = ActiveAlert(event.alertId, event.requestType, event.level, confirmed = true),
+            alert = ActiveAlert(event.alertId, event.requestType, event.level, confirmed = true, signals = event.signals),
             alertOpen = true,
             monitor = if (state.monitor == Monitor.Unavailable) Monitor.Unavailable else Monitor.Listening,
             lastRevision = event.revision,

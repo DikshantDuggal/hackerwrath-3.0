@@ -26,6 +26,14 @@ class Config:
     twilio_api_key_secret: str = ""
     twilio_twiml_app_sid: str = ""
     twilio_push_credential_sid: str = ""
+    # Detection plug-ins (docs/plugins.md). "none" never warns.
+    phrase_engine: str = "none"
+    detector_provider: str = "none"
+    detector_timeout_seconds: float = 3.0
+    detector_rate_per_minute: int = 40
+    detector_url: str = ""
+    detector_token: str = ""
+    detection_plugins: tuple[str, ...] = ()
     heartbeat_seconds: float = 3.0
     # Multiplies every delay in the demo call driver; tests use a tiny value.
     demo_time_scale: float = 1.0
@@ -60,4 +68,11 @@ def load_config() -> Config:
         twilio_api_key_secret=os.environ.get("TWILIO_API_KEY_SECRET", ""),
         twilio_twiml_app_sid=os.environ.get("TWILIO_TWIML_APP_SID", ""),
         twilio_push_credential_sid=os.environ.get("TWILIO_PUSH_CREDENTIAL_SID", ""),
+        phrase_engine=os.environ.get("PHRASE_ENGINE", "none"),
+        detector_provider=os.environ.get("DETECTOR_PROVIDER", "none"),
+        detector_timeout_seconds=float(os.environ.get("DETECTOR_TIMEOUT", "3.0")),
+        detector_rate_per_minute=int(os.environ.get("DETECTOR_RATE_PER_MINUTE", "40")),
+        detector_url=os.environ.get("DETECTOR_URL", ""),
+        detector_token=os.environ.get("DETECTOR_TOKEN", ""),
+        detection_plugins=tuple(m.strip() for m in os.environ.get("DETECTION_PLUGINS", "").split(",") if m.strip()),
     )

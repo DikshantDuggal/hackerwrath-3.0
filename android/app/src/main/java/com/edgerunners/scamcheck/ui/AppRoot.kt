@@ -65,10 +65,10 @@ import com.edgerunners.scamcheck.ui.spell.SpellToast
 import com.edgerunners.scamcheck.ui.spell.StoryScreen
 import com.edgerunners.scamcheck.ui.spell.Tab
 import com.edgerunners.scamcheck.ui.spell.TabsScreen
+import com.edgerunners.scamcheck.ui.spell.alertOnNight
 import com.edgerunners.scamcheck.ui.spell.rememberElapsed
 import com.edgerunners.scamcheck.ui.theme.LocalReduceMotion
 import com.edgerunners.scamcheck.ui.theme.Spell
-import com.edgerunners.scamcheck.ui.theme.alertLooks
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -139,7 +139,7 @@ fun AppRoot(state: AppUiState, controller: AppController) {
         // Status and navigation bar icons: light over the dark call screens and most alert looks.
         val premium = Spell.colors.premium
         val alertShowing = state.call.alertOpen && state.call.phase == CallPhase.InCall && !state.held
-        val lightAlert = alertShowing && alertLooks(Spell.edition).let { looks -> looks[((state.alertRuns - 1) % looks.size + looks.size) % looks.size].bg.luminance() > 0.5f }
+        val lightAlert = alertShowing && !alertOnNight(state.alertRuns) && Spell.colors.bg.luminance() > 0.5f
         val darkScreen = when {
             alertShowing -> !lightAlert
             state.held -> premium

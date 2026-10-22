@@ -6,6 +6,7 @@ import asyncio
 import secrets
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -28,6 +29,8 @@ class CallSession:
     seq: int = 0
     revision: int = 0
     tasks: list[asyncio.Task] = field(default_factory=list)
+    # The engine.session.CallEngine analysing this call, when one is.
+    engine: Any = None
 
     def next_seq(self) -> int:
         self.seq += 1

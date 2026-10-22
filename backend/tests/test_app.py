@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from app.config import Config
+from app.events import SIGNALS
 from app.main import create_app
 
 SECRET = "x" * 40
@@ -165,9 +166,10 @@ def test_no_event_carries_free_text_or_safe_wording(client):
         client.post(f"/api/calls/{call_id}/actions", json={"action": "answer"}, headers=auth(token))
         events = read_until(ws, "confirmed")
     allowed = {"v", "call_id", "event_seq", "type", "state", "reason", "assessment_revision",
-               "alert_id", "request_type", "level", "from_number", "demo"}
+               "alert_id", "request_type", "level", "from_number", "demo", "signals"}
     for event in events:
         assert set(event) <= allowed
+        assert set(event.get("signals", [])) <= SIGNALS
         assert "safe" not in json.dumps(event).lower()
 
 
@@ -205,6 +207,59 @@ def test_unknown_call_is_404(client):
     token = login(client)
     res = client.post("/api/calls/call_nope/actions", json={"action": "end"}, headers=auth(token))
     assert res.status_code == 404
+
+
+def plugged_client(**plugins) -> TestClient:
+    config = Config(
+        app_jwt_secret=SECRET,
+        demo_users={"demo-user": "pw"},
+        demo_mode=True,
+        heartbeat_seconds=1.0,
+        demo_time_scale=0.01,
+        **plugins,
+    )
+    return TestClient(create_app(config))
+
+
+def test_remote_access_demo_confirms_high_risk_with_its_signals(client):
+    token = login(client)
+    with client.websocket_connect("/ws/app") as ws:
+        ws.send_json({"type": "auth", "app_token": token})
+        ws.receive_json()
+        call_id = client.post("/api/demo/calls", json={"scenario": "remote_access"}, headers=auth(token)).json()["call_id"]
+        ws.receive_json()
+        client.post(f"/api/calls/{call_id}/actions", json={"action": "answer"}, headers=auth(token))
+        confirmed = read_until(ws, "confirmed")[-1]
+    assert (confirmed["request_type"], confirmed["level"]) == ("remote_access", "high")
+    assert confirmed["signals"] == ["remote_access", "otp_or_pin_request", "financial_solicitation"]
+
+
+def test_detector_demo_runs_the_plugged_in_code_end_to_end():
+    with plugged_client(phrase_engine="example", detector_provider="example") as client:
+        token = login(client)
+        with client.websocket_connect("/ws/app") as ws:
+            ws.send_json({"type": "auth", "app_token": token})
+            ws.receive_json()
+            call_id = client.post("/api/demo/calls", json={"scenario": "detector"}, headers=auth(token)).json()["call_id"]
+            ws.receive_json()
+            client.post(f"/api/calls/{call_id}/actions", json={"action": "answer"}, headers=auth(token))
+            events = read_until(ws, "confirmed")
+    first = next(e for e in events if e["type"] == "first_warning")
+    assert (first["request_type"], first["level"]) == ("otp_share", "possible")
+    assert (events[-1]["request_type"], events[-1]["level"]) == ("otp_share", "high")
+
+
+def test_detector_demo_is_refused_when_the_plug_in_is_missing():
+    with plugged_client(detector_provider="not_built_yet") as client:
+        token = login(client)
+        res = client.post("/api/demo/calls", json={"scenario": "detector"}, headers=auth(token))
+    assert res.status_code == 503
+    assert res.json()["error"]["code"] == "detector_not_available"
+
+
+def test_a_missing_plug_in_module_stops_the_server_at_startup():
+    with pytest.raises(ModuleNotFoundError):
+        create_app(Config(app_jwt_secret=SECRET, demo_users={"demo-user": "pw"}, detection_plugins=("friends.not_here",)))
 
 
 def test_demo_calls_are_off_unless_demo_mode():

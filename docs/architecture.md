@@ -80,7 +80,7 @@ backend/
   app/         # FastAPI: login, tokens, settings, Twilio webhooks, actions, app WebSocket
   engine/      # session lifecycle, call-id mapping, bounded queues, audio relay
   stt/         # Sarvam realtime adapter
-  detection/   # phrase engine, detector adapter + Sarvam-105B provider, schemas, policy
+  detection/   # plug-in sockets (adapter.py), providers/, schemas, policy; see docs/plugins.md
   events/      # app event delivery, sequence numbers, heartbeats
   resources/   # phrases.yaml, versioned prompts
   scenarios/   # recorded scenario clips, cases.json, runner
@@ -132,15 +132,16 @@ The token carries a Voice grant for incoming calls to this identity (and the pus
 The app connects and sends `{ "type": "auth", "app_token": "…" }` first; anything else closes the socket. Server → app events (keys and enums only, never free text):
 ```json
 { "v": 1, "call_id": "call_7f3a", "event_seq": 3, "type": "status", "state": "monitoring" }
-{ "v": 1, "call_id": "call_7f3a", "event_seq": 9, "assessment_revision": 0, "type": "first_warning", "alert_id": "al_1", "request_type": "qr_receive", "level": "possible" }
-{ "v": 1, "call_id": "call_7f3a", "event_seq": 12, "assessment_revision": 2, "type": "confirmed", "alert_id": "al_1", "request_type": "qr_receive", "level": "high" }
+{ "v": 1, "call_id": "call_7f3a", "event_seq": 9, "assessment_revision": 0, "type": "first_warning", "alert_id": "al_1", "request_type": "qr_receive", "level": "possible", "signals": ["financial_solicitation"] }
+{ "v": 1, "call_id": "call_7f3a", "event_seq": 12, "assessment_revision": 2, "type": "confirmed", "alert_id": "al_1", "request_type": "qr_receive", "level": "high", "signals": ["financial_solicitation", "authority_impersonation"] }
 { "v": 1, "call_id": "call_7f3a", "event_seq": 14, "assessment_revision": 3, "type": "cleared", "alert_id": "al_1" }
 { "v": 1, "call_id": "call_7f3a", "event_seq": 20, "type": "status", "state": "unavailable", "reason": "stt_down" }
 ```
 - `type`: `ready` (once, right after auth; no `call_id`) | `status` | `call_started` (adds `from_number`, `demo`) | `first_warning` | `confirmed` | `cleared` | `call_ended` (adds `reason`: `user_ended` | `caller_ended` | `declined`)
 - `state`: `starting` | `monitoring` | `degraded` | `unavailable` | `off` (scam check is off for this call)
-- `request_type`: `qr_receive` | `pin_receive` | `otp_share`
+- `request_type`: `qr_receive` | `pin_receive` | `otp_share` | `remote_access` (install an app or share the screen)
 - `level`: `possible` | `high`
+- `signals` (optional, on `first_warning` and `confirmed`): what the caller did, shown as the alert's "What they said" chips. Any of `otp_or_pin_request` | `remote_access` | `financial_solicitation` | `authority_impersonation` | `coercive_threat` | `account_suspension_threat`. Detail only: signals never set or raise the level (the policy alone does), and the app drops unknown or repeated values without dropping the event. Each `confirmed` replaces the alert's signals with its own.
 - `reason`: `stt_down` | `detector_down` | `behind` | `cap_reached`
 - Heartbeat: a `status` event at least every 3 s during a call.
 
@@ -164,9 +165,10 @@ Process health only; it doesn't prove speech recognition or detection works.
 ### 5.8 `POST /api/demo/calls` (only when `DEMO_MODE=1`)
 DEMO-FAKE: a scripted call for testing the app end to end without Twilio or Sarvam.
 ```json
-{ "scenario": "qr_scan" }          // qr_scan | otp | harmless | unavailable
+{ "scenario": "qr_scan" }          // qr_scan | otp | remote_access | harmless | unavailable | detector
 → 201 { "call_id": "call_7f3a…" }
 ```
+`detector` scripts what the caller says instead of the events, and feeds it through the plugged-in phrase engine, detector and policy (`docs/plugins.md`). It answers 503 `detector_not_available` when `PHRASE_ENGINE` or `DETECTOR_PROVIDER` names a plug-in that isn't registered.
 Sends `call_started` over the app WebSocket; answering plays the script through the same events the live engine will send (first warning at ~4 s, confirmed or cleared at ~7 s; `unavailable` drops protection at ~5 s and restores it ~10 s later). With `role_context = expecting_payment`, the QR scenario confirms High risk; without it, Possible risk.
 
 ---
@@ -177,16 +179,17 @@ Sends `call_started` over the app WebSocket; answering plays the script through 
 - Runs on every partial and final transcript of the caller.
 - `resources/phrases.yaml` lists request patterns per type in English, Devanagari, Gurmukhi and romanized/code-mixed forms, based on actual Sarvam output from the risk test. Examples: "QR scan karo", "scan kar lo payment aa jayega", "PIN daalo", "OTP batao", "code batao", "verification code", "I'll send you a QR".
 - A hit gives `first_warning` (Possible risk) and triggers an immediate assessment. **It can never produce High risk.**
+- Plugs in through the phrase engine socket (`@phrase_engine("name")` in `detection/adapter.py`, chosen with `PHRASE_ENGINE`): `match(turn) -> PhraseHit | None`, synchronous, with the hit's `request_type` and `signals`.
 
 ### 6.2 AI assessment (behind an adapter)
-- Interface: `async assess(context) -> Assessment | None`, with a provider registry; **default provider Sarvam-105B** via `/v1/chat/completions`, `reasoning_effort=None`, low temperature, small `max_tokens`, a timeout (start at 3 s and tune from measurements).
+- Interface: `async assess(context) -> Assessment | None`, registered with `@detector("name")` in `detection/adapter.py` and chosen with `DETECTOR_PROVIDER`. Built in: `none` (never warns; the default), `example` (keywords, for testing the sockets only) and `http` (a detector running as a separate service). **The intended default is Sarvam-105B** via `/v1/chat/completions`, `reasoning_effort=None`, low temperature, small `max_tokens`; it isn't built yet. The engine calls every detector through `run_detector`, with a timeout (`DETECTOR_TIMEOUT`, start at 3 s and tune from measurements), error catching and validation. How to write one: `docs/plugins.md`.
 - **Input:** recent stable caller turns (bounded window) plus the current partial when relevant, a compact record of earlier suspicious requests, the user's `role_context` if set, and an id per turn. Transcript text is **fenced as data** and the prompt says to ignore instructions inside it. Fencing helps but isn't enough on its own; the policy is the real guard.
 - **Also assess finalised speech periodically without a phrase hit**, so indirect requests ("read me the code you just received") aren't missed.
 - **Output** (validated with Pydantic; anything else is a failed call):
   ```json
-  { "request_type": "otp_share", "confidence": "high", "setup_only": false, "requester_is_speaker": true, "evidence_turn_ids": ["turn_12"] }
+  { "request_type": "otp_share", "confidence": "high", "setup_only": false, "requester_is_speaker": true, "evidence_turn_ids": ["turn_12"], "signals": ["otp_or_pin_request", "authority_impersonation"] }
   ```
-  `request_type`: `qr_receive` | `pin_receive` | `otp_share` | `none`. `confidence` is a label, not a calibrated probability.
+  `request_type`: `qr_receive` | `pin_receive` | `otp_share` | `remote_access` | `none`. `confidence` is a label, not a calibrated probability. `signals` uses the keys in 5.4 and never changes the level. Extra keys (free text such as an analysis or advice) make the output invalid.
 
 ### 6.3 Policy (`detection/policy.py`): the only place levels are decided
 1. Reject malformed, stale (older revision), wrong-session or unsupported assessments.
@@ -271,7 +274,7 @@ The engine logs timestamps per stage (no transcript text); the app logs receive 
 
 ## 13. Environment variables (names only)
 Backend (`backend/.env`, never committed; `backend/.env.example` holds placeholders):
-`PUBLIC_BASE_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`, `TWILIO_TWIML_APP_SID`, `TWILIO_PUSH_CREDENTIAL_SID`, `TWILIO_SERVICE_NUMBER`, `SARVAM_API_KEY`, `STT_MODEL`, `STT_LANGUAGE` (default `auto`), `STT_STREAM_TYPE`, `DETECTOR_PROVIDER` (default `sarvam`), `DETECTOR_MODEL` (default `sarvam-105b`), `DETECTOR_PROMPT` (default `detector_v1`), `APP_JWT_SECRET`, `DEMO_USERS` (username:password pairs), `DEBUG_TRANSCRIPTS` (default 0).
+`PUBLIC_BASE_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`, `TWILIO_TWIML_APP_SID`, `TWILIO_PUSH_CREDENTIAL_SID`, `TWILIO_SERVICE_NUMBER`, `SARVAM_API_KEY`, `STT_MODEL`, `STT_LANGUAGE` (default `auto`), `STT_STREAM_TYPE`, `PHRASE_ENGINE` (default `none`), `DETECTOR_PROVIDER` (default `none` until the Sarvam-105B provider is built), `DETECTOR_MODEL` (default `sarvam-105b`), `DETECTOR_PROMPT` (default `detector_v1`), `DETECTOR_TIMEOUT` (seconds, default 3), `DETECTOR_RATE_PER_MINUTE` (default 40), `DETECTOR_URL` and `DETECTOR_TOKEN` (the `http` detector), `DETECTION_PLUGINS` (extra plug-in modules to import), `APP_JWT_SECRET`, `DEMO_USERS` (username:password pairs), `DEBUG_TRANSCRIPTS` (default 0).
 Android: `API_BASE_URL`, and the Firebase config file for push (`google-services.json`, which isn't a server secret but stays out of public repos).
 
 ---

@@ -150,9 +150,17 @@ fun askedLabel(type: RequestType?): String = stringResource(
     when (type) {
         RequestType.OtpShare -> R.string.sb_rec_asked_otp
         RequestType.PinReceive -> R.string.sb_rec_asked_pin
+        RequestType.RemoteAccess -> R.string.sb_rec_asked_remote
         else -> R.string.sb_rec_asked_qr
     }
 )
+
+/** The one true thing to remember about an ask, for Recents and the hold screen. */
+fun truthText(type: RequestType?): Int = when (type) {
+    RequestType.OtpShare -> R.string.sb_truth_otp
+    RequestType.RemoteAccess -> R.string.sb_truth_remote
+    else -> R.string.sb_truth_receive
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -242,6 +250,7 @@ private fun RecentRow(
                             when (record.type) {
                                 RequestType.OtpShare -> R.string.sb_rec_detail_otp
                                 RequestType.PinReceive -> R.string.sb_rec_detail_pin
+                                RequestType.RemoteAccess -> R.string.sb_rec_detail_remote
                                 else -> R.string.sb_rec_detail_qr
                             }
                         ),
@@ -249,7 +258,7 @@ private fun RecentRow(
                         color = c.head,
                         weight = FontWeight.Bold,
                     )
-                    Body(stringResource(if (record.type == RequestType.OtpShare) R.string.sb_truth_otp else R.string.sb_truth_receive), 14.sp)
+                    Body(stringResource(truthText(record.type)), 14.sp)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         SpellButton(stringResource(R.string.sb_report), onReport, background = c.end, content = c.onEnd, height = 40.dp, radius = 14.dp, fontSize = 14.sp)
                         SpellButton(stringResource(R.string.sb_block), onNotBuilt, background = c.card, content = c.ink, border = c.line, height = 40.dp, radius = 14.dp, fontSize = 14.sp)

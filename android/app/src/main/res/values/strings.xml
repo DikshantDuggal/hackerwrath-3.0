@@ -69,6 +69,8 @@
     <string name="alert_otp_title">They asked you to share an OTP.</string>
     <string name="alert_otp_body">An OTP can let someone take money or your account. Never share it on a call.</string>
     <string name="alert_otp_next">End the call. If it was your bank, call the number on your card.</string>
+    <string name="alert_remote_title">They asked you to install an app or share your screen.</string>
+    <string name="alert_remote_body">With your screen or an app, someone can see your codes and take your money. Never do it for a caller.</string>
     <string name="next_step">Next step</string>
     <string name="spoken_warning">Spoken warning playing</string>
     <string name="continue_call">Continue</string>
@@ -134,6 +136,7 @@
     <string name="sb_day_qr">A caller asked you to scan a QR.</string>
     <string name="sb_day_pin">A caller asked for your UPI PIN.</string>
     <string name="sb_day_otp">A caller asked for your OTP.</string>
+    <string name="sb_day_remote">A caller asked for your screen or an app.</string>
     <string name="sb_fuse_left">%1$s · they asked</string>
     <string name="sb_fuse_hung_up">you hung up · %1$d s</string>
     <string name="sb_fuse_caller_left">they hung up · %1$d s</string>
@@ -158,6 +161,7 @@
     <string name="sb_rec_asked_qr">Asked you to scan a QR</string>
     <string name="sb_rec_asked_pin">Asked for your UPI PIN</string>
     <string name="sb_rec_asked_otp">Asked for your OTP</string>
+    <string name="sb_rec_asked_remote">Asked for your screen or an app</string>
     <string name="sb_rec_hung_up">%1$s · you hung up</string>
     <string name="sb_rec_kept">%1$s · you kept talking</string>
     <string name="sb_rec_caller_left">%1$s · they hung up</string>
@@ -169,8 +173,10 @@
     <string name="sb_rec_detail_qr">They asked you to scan a QR code to receive money.</string>
     <string name="sb_rec_detail_pin">They asked for your UPI PIN to receive money.</string>
     <string name="sb_rec_detail_otp">They asked for the code sent to your phone.</string>
+    <string name="sb_rec_detail_remote">They asked you to install an app or share your screen.</string>
     <string name="sb_truth_receive">Receiving money never needs a scan or your UPI PIN.</string>
     <string name="sb_truth_otp">No real bank or delivery company asks for an OTP on a call.</string>
+    <string name="sb_truth_remote">No real bank or company needs your screen or an app on your phone.</string>
     <string name="sb_report">Report number</string>
     <string name="sb_block">Block</string>
     <string name="sb_tell">Tell %1$s</string>
@@ -286,15 +292,29 @@
     <string name="sb_heard_qr">Heard: a QR code to “receive” money</string>
     <string name="sb_heard_pin">Heard: a request for your UPI PIN</string>
     <string name="sb_heard_otp">Heard: a request for your OTP</string>
+    <string name="sb_heard_remote">Heard: a request for your screen or an app</string>
 
     <!-- The alert -->
-    <string name="sb_asked_ago">· they asked %1$d s ago</string>
+    <string name="sb_asked_ago">they asked %1$d s ago</string>
     <string name="sb_word_qr">DON\'T SCAN.</string>
     <string name="sb_word_pin">NO PIN.</string>
     <string name="sb_word_otp">DON\'T SHARE.</string>
     <string name="sb_pword_qr">Don\'t scan.</string>
     <string name="sb_pword_pin">No PIN.</string>
     <string name="sb_pword_otp">Don\'t share.</string>
+    <string name="sb_word_remote">NO APPS.</string>
+    <string name="sb_pword_remote">No apps.</string>
+    <string name="sb_line_remote">They want an app on your phone or your screen. With it, they can see your codes and take your money.</string>
+    <string name="sb_q_remote">Did they say it\'s to fix your account?</string>
+    <string name="sb_yes_remote">That is the trick. Nobody needs your screen or an app to fix your account.</string>
+    <string name="sb_no_remote">Whoever they are: never install an app or share your screen for a caller.</string>
+    <string name="sb_what_they_said">What they said</string>
+    <string name="signal_otp_or_pin_request">Wants a code or PIN</string>
+    <string name="signal_remote_access">Wants your screen or an app</string>
+    <string name="signal_financial_solicitation">Wants money</string>
+    <string name="signal_authority_impersonation">Claims to be your bank</string>
+    <string name="signal_coercive_threat">Pressuring you</string>
+    <string name="signal_account_suspension_threat">Threatens your account</string>
     <string name="sb_line_qr">They said scanning a QR gets you money. Scanning sends money out.</string>
     <string name="sb_line_pin">They said your UPI PIN gets you money. Your PIN only ever sends money out.</string>
     <string name="sb_line_otp">They asked for the code sent to your phone. With it, they can take your money.</string>

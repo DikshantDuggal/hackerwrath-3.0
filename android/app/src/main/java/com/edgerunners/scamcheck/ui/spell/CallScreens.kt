@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -92,11 +93,9 @@ import com.edgerunners.scamcheck.model.RequestType
 import com.edgerunners.scamcheck.model.RiskLevel
 import com.edgerunners.scamcheck.ui.Motion
 import com.edgerunners.scamcheck.ui.theme.AlertEntrance
-import com.edgerunners.scamcheck.ui.theme.AlertLook
 import com.edgerunners.scamcheck.ui.theme.Edition
 import com.edgerunners.scamcheck.ui.theme.LocalReduceMotion
 import com.edgerunners.scamcheck.ui.theme.Spell
-import com.edgerunners.scamcheck.ui.theme.alertLooks
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -277,6 +276,7 @@ private fun NightToggle(icon: androidx.compose.ui.graphics.vector.ImageVector, l
 private fun heardText(type: RequestType?): Int = when (type) {
     RequestType.OtpShare -> R.string.sb_heard_otp
     RequestType.PinReceive -> R.string.sb_heard_pin
+    RequestType.RemoteAccess -> R.string.sb_heard_remote
     else -> R.string.sb_heard_qr
 }
 
@@ -288,12 +288,76 @@ private fun copyFor(type: RequestType): AlertCopy = when (type) {
     RequestType.QrReceive -> AlertCopy(R.string.sb_word_qr, R.string.sb_pword_qr, R.string.sb_line_qr, R.string.sb_q_qr, R.string.sb_yes_qr, R.string.sb_no_qr, AskGlyph.Qr)
     RequestType.PinReceive -> AlertCopy(R.string.sb_word_pin, R.string.sb_pword_pin, R.string.sb_line_pin, R.string.sb_q_pin, R.string.sb_yes_qr, R.string.sb_no_qr, AskGlyph.Pin)
     RequestType.OtpShare -> AlertCopy(R.string.sb_word_otp, R.string.sb_pword_otp, R.string.sb_line_otp, R.string.sb_q_otp, R.string.sb_yes_otp, R.string.sb_no_otp, AskGlyph.Code)
+    RequestType.RemoteAccess -> AlertCopy(R.string.sb_word_remote, R.string.sb_pword_remote, R.string.sb_line_remote, R.string.sb_q_remote, R.string.sb_yes_remote, R.string.sb_no_remote, AskGlyph.Install)
+}
+
+/** One alert's colours, every one from the app's palette: red for High risk, amber for Possible. */
+private data class AlertSkin(
+    val bg: Color,
+    val glow: Color,
+    val fg: Color,
+    val muted: Color,
+    val pill: Pair<Color, Color>,
+    val word: Color,
+    val badge: Pair<Color, Color>,
+    val chip: Pair<Color, Color>,
+    val line: Color?,
+    val eyebrow: Color,
+    val card: Color,
+    val cardLine: Color,
+    val answer: Pair<Color, Color>,
+    val end: Pair<Color, Color>,
+    val holdBorder: Color,
+    val holdContent: Color,
+    val keep: Color,
+    val entrance: AlertEntrance,
+)
+
+/** Runs go day, night (the call screens' palette), day, each with its own entrance. */
+fun alertOnNight(run: Int): Boolean = (run - 1).mod(3) == 1
+
+@Composable
+private fun alertSkin(run: Int, level: RiskLevel): AlertSkin {
+    val c = Spell.colors
+    val high = level == RiskLevel.High
+    val entrance = when ((run - 1).mod(3)) {
+        0 -> AlertEntrance.ZoomIn
+        1 -> AlertEntrance.Jiggle
+        else -> AlertEntrance.Slam
+    }
+    return if (alertOnNight(run)) {
+        val accent = if (high) c.hangUp else c.warn
+        AlertSkin(
+            bg = c.night, glow = if (high) accent.copy(alpha = 0.16f) else c.warnGlow,
+            fg = c.nightInk, muted = c.nightMuted,
+            pill = if (high) c.hangUp to c.night else c.warn to c.onWarn,
+            word = accent, badge = c.nightCard to accent, chip = c.nightCard to c.nightInk, line = c.nightLine,
+            eyebrow = c.nightMuted, card = c.nightCard, cardLine = c.nightLine,
+            answer = c.earOff to c.nightInk, end = c.hangUp to c.night,
+            holdBorder = c.nightMuted, holdContent = c.nightInk, keep = c.nightMuted,
+            entrance = entrance,
+        )
+    } else {
+        val badge = if (high) c.badgeQr else c.badgeOtp
+        // Premium's day surface is dark, where its deep red word would not read.
+        val word = if (high && c.bg.luminance() > 0.5f) c.end else badge.second
+        AlertSkin(
+            bg = c.bg, glow = if (high) c.end.copy(alpha = 0.16f) else c.warnGlow,
+            fg = c.ink, muted = c.faint,
+            pill = if (high) c.end to c.onEnd else c.warn to c.onWarn,
+            word = word, badge = badge, chip = badge, line = null,
+            eyebrow = c.eyebrow, card = c.card, cardLine = c.line,
+            answer = c.accentC to c.onAccentC, end = c.end to c.onEnd,
+            holdBorder = c.accent, holdContent = c.accent, keep = c.muted,
+            entrance = entrance,
+        )
+    }
 }
 
 /**
- * The full-screen alert. It breaks the app's look on purpose and wears a different face each
- * run (red field, night siren, red frame) so it never turns into wallpaper. Same words, same
- * order, same buttons every time.
+ * The full-screen alert, in the app's own look. It wears a different face each run (day,
+ * night, day, each arriving differently) so it never turns into wallpaper. Same words, same
+ * order, same buttons every time; "What they said" shows the signals the server named.
  */
 @Composable
 fun SpellAlertScreen(
@@ -305,15 +369,14 @@ fun SpellAlertScreen(
     onKeepTalking: () -> Unit,
 ) {
     val edition = Spell.edition
-    val looks = alertLooks(edition)
-    val look = looks[((run - 1) % looks.size + looks.size) % looks.size]
+    val skin = alertSkin(run, alert.level)
     val copy = copyFor(alert.type)
     var answer by rememberSaveable(alert.id) { mutableStateOf<Boolean?>(null) }
     val reduce = LocalReduceMotion.current
     val entrance = remember(alert.id) { Animatable(if (reduce) 1f else 0f) }
     LaunchedEffect(alert.id) {
         if (!reduce) {
-            when (look.entrance) {
+            when (skin.entrance) {
                 AlertEntrance.ZoomIn -> entrance.animateTo(1f, tween(550, easing = CubicBezierEasing(0.2f, 1.3f, 0.4f, 1f)))
                 AlertEntrance.Jiggle -> entrance.animateTo(1f, tween(700, easing = LinearEasing))
                 AlertEntrance.Slam -> entrance.animateTo(1f, tween(600, easing = CubicBezierEasing(0.2f, 1.25f, 0.4f, 1f)))
@@ -327,53 +390,62 @@ fun SpellAlertScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .graphicsLayer { applyEntrance(look.entrance, entrance.value) }
-            .background(look.bg, if (look.entrance == AlertEntrance.ZoomIn) RoundedCornerShape(((1f - entrance.value.coerceIn(0f, 1f)) * 200f).dp) else RectangleShape)
-            .alertFrame(look)
+            .graphicsLayer { applyEntrance(skin.entrance, entrance.value) }
+            .clip(if (skin.entrance == AlertEntrance.ZoomIn) RoundedCornerShape(((1f - entrance.value.coerceIn(0f, 1f)) * 200f).dp) else RectangleShape)
+            .background(skin.bg)
             .semantics { paneTitle = title },
     ) {
+        GlowBackground(skin.glow, Modifier.matchParentSize())
         PinnedColumn(
             PaddingValues(start = 22.dp, end = 22.dp, top = 54.dp, bottom = 24.dp),
-            spacing = 16.dp,
+            spacing = 14.dp,
             top = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     stringResource(if (alert.level == RiskLevel.High) R.string.level_high else R.string.level_possible).uppercase(),
-                    style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.16.em),
-                    color = look.fg,
+                    style = Spell.type.eyebrow,
+                    color = skin.pill.second,
+                    modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(skin.pill.first).padding(horizontal = 12.dp, vertical = 6.dp),
                 )
                 if (askedAgoSeconds > 0) {
                     Text(
-                        " " + stringResource(R.string.sb_asked_ago, askedAgoSeconds.toInt()),
-                        style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.04.em),
-                        color = look.fg.copy(alpha = 0.8f),
+                        stringResource(R.string.sb_asked_ago, askedAgoSeconds.toInt()),
+                        style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                        color = skin.muted,
                     )
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                FlexWord(title, look.highlight, Modifier.weight(1f).semantics {
+                FlexWord(title, skin.word, Modifier.weight(1f).semantics {
                     heading()
                     liveRegion = LiveRegionMode.Assertive
                 })
-                CrossedGlyph(copy.glyph, look.highlight, Modifier.size(76.dp))
+                val tile = RoundedCornerShape(26.dp)
+                Box(
+                    Modifier.size(84.dp).clip(tile).background(skin.badge.first)
+                        .then(if (skin.line != null) Modifier.border(1.dp, skin.line, tile) else Modifier),
+                    contentAlignment = Alignment.Center,
+                ) { CrossedGlyph(copy.glyph, skin.badge.second, Modifier.size(56.dp)) }
             }
-            Text(stringResource(copy.line), style = TextStyle(fontSize = 19.sp, lineHeight = 25.5.sp, fontWeight = FontWeight.Bold), color = look.fg)
+            Text(stringResource(copy.line), style = TextStyle(fontSize = 19.sp, lineHeight = 25.5.sp, fontWeight = FontWeight.Bold), color = skin.fg)
+            if (alert.signals.isNotEmpty()) SignalChips(alert.signals, label = skin.eyebrow, chip = skin.chip, line = skin.line)
+            val card = RoundedCornerShape(22.dp)
             Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(look.card).padding(16.dp),
+                Modifier.fillMaxWidth().clip(card).background(skin.card).border(1.dp, skin.cardLine, card).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 val chosen = answer
                 if (chosen == null) {
-                    Text(stringResource(copy.question), style = TextStyle(fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold), color = look.fg)
+                    Text(stringResource(copy.question), style = TextStyle(fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold), color = skin.fg)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SpellButton(stringResource(R.string.sb_yes), { answer = true }, Modifier.weight(1f), background = Color.Transparent, content = look.fg, border = look.fg, height = 48.dp, radius = 16.dp, fontSize = 15.sp)
-                        SpellButton(stringResource(R.string.sb_no), { answer = false }, Modifier.weight(1f), background = Color.Transparent, content = look.fg, border = look.fg, height = 48.dp, radius = 16.dp, fontSize = 15.sp)
+                        SpellButton(stringResource(R.string.sb_yes), { answer = true }, Modifier.weight(1f), background = skin.answer.first, content = skin.answer.second, height = 48.dp, radius = 16.dp, fontSize = 15.sp)
+                        SpellButton(stringResource(R.string.sb_no), { answer = false }, Modifier.weight(1f), background = skin.answer.first, content = skin.answer.second, height = 48.dp, radius = 16.dp, fontSize = 15.sp)
                     }
                 } else {
                     Text(
                         stringResource(if (chosen) copy.yes else copy.no),
                         style = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold),
-                        color = look.fg,
+                        color = skin.fg,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                     )
                 }
@@ -385,13 +457,13 @@ fun SpellAlertScreen(
                 Modifier.fillMaxWidth().drawBehind {
                     drawRoundRect(shadow, topLeft = Offset(0f, 10.dp.toPx()), size = size, cornerRadius = CornerRadius(28.dp.toPx()))
                 },
-                background = look.end, content = look.onEnd, height = 74.dp, radius = 28.dp, fontSize = 22.sp, weight = FontWeight.Black,
+                background = skin.end.first, content = skin.end.second, height = 74.dp, radius = 28.dp, fontSize = 22.sp, weight = FontWeight.Black,
             )
             SpellButton(
                 stringResource(R.string.sb_hold_caller), onHold, Modifier.fillMaxWidth(),
-                background = Color.Transparent, content = look.fg, border = look.line, height = 54.dp, radius = 20.dp, fontSize = 16.sp,
+                background = Color.Transparent, content = skin.holdContent, border = skin.holdBorder, height = 54.dp, radius = 20.dp, fontSize = 16.sp,
             )
-            KeepTalkingButton(look.fg, onKeepTalking)
+            KeepTalkingButton(skin.keep, onKeepTalking)
             },
         )
     }
@@ -422,16 +494,6 @@ private fun androidx.compose.ui.graphics.GraphicsLayerScope.applyEntrance(entran
         AlertEntrance.Slam -> translationY = -size.height * (1f - p)
     }
     transformOrigin = TransformOrigin.Center
-}
-
-/** The red frame inside the edge (run 3, and Premium's red field). */
-private fun Modifier.alertFrame(look: AlertLook): Modifier {
-    val frame = look.frame ?: return this
-    return drawBehind {
-        val w = look.frameWidth.toPx()
-        drawRect(frame, topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w), style = Stroke(w))
-        look.frameHairline?.let { drawRect(it, topLeft = Offset(w, w), size = Size(size.width - 2 * w, size.height - 2 * w), style = Stroke(1.dp.toPx())) }
-    }
 }
 
 /** The big word arrives narrow and light and stretches out heavy (letter spacing tightens as it lands). */
@@ -552,7 +614,7 @@ fun PauseScreen(heldAtMs: Long, type: RequestType?, onEndCall: () -> Unit, onRes
             Display(stringResource(R.string.sb_on_hold), 34f, lineHeight = 1.05f, align = TextAlign.Center)
             Body(stringResource(R.string.sb_on_hold_body), 16.sp, lineHeight = 1.5f, align = TextAlign.Center, modifier = Modifier.widthIn(max = 300.dp))
             Text(
-                stringResource(if (type == RequestType.OtpShare) R.string.sb_truth_otp else R.string.sb_truth_receive),
+                stringResource(truthText(type)),
                 style = TextStyle(fontSize = 16.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold),
                 color = c.onAccentC,
                 textAlign = TextAlign.Center,

@@ -30,7 +30,7 @@ class SettingsBody(BaseModel):
 
 class ActionIn(BaseModel):
     action: Literal["answer", "end", "continue", "hold", "resume", "report", "decline"]
-    request_type: Literal["qr_receive", "pin_receive", "otp_share"] | None = None
+    request_type: Literal["qr_receive", "pin_receive", "otp_share", "remote_access"] | None = None
 
 
 class ActionOut(BaseModel):
@@ -39,7 +39,7 @@ class ActionOut(BaseModel):
 
 
 class DemoCallIn(BaseModel):
-    scenario: Literal["qr_scan", "otp", "harmless", "unavailable"] = "qr_scan"
+    scenario: Literal["qr_scan", "otp", "remote_access", "harmless", "unavailable", "detector"] = "qr_scan"
 
 
 class DemoCallOut(BaseModel):

@@ -7,22 +7,23 @@ Read `AGENTS.md`, `docs/architecture.md`, `docs/build-plan.md` and `docs/ux-flow
 ## What works today
 | Part | State |
 |---|---|
-| Android app in the **Spellbreaker** design (from the "Scam Check Guardian" design canvas): sign-in; Home with the guardian switch, week dial and scams-stopped count; Recents; Contacts and Your circle; settings, demo-call, recovery and keypad sheets; incoming call; "at your ear" call screen (Listening / Checking / Unavailable / Off); the full-screen alert that rotates through three looks (red field, night siren, red frame); on-hold screen; after-call story; "Feel a warning" practice | Built, not yet compiled |
+| Android app in the **Spellbreaker** design (from the "Scam Check Guardian" design canvas): sign-in; Home with the guardian switch, week dial and scams-stopped count; Recents; Contacts and Your circle; settings, demo-call, recovery and keypad sheets; incoming call; "at your ear" call screen (Listening / Checking / Unavailable / Off); the full-screen alert in the app's own palette, rotating day / night / day with a different entrance each time, with "What they said" chips; on-hold screen; after-call story; "Feel a warning" practice | Built, not yet compiled |
 | Call history for Recents and the week dial: masked number, times, outcome and request type, on the phone only | Built |
 | App ↔ backend: REST (login, settings, voice token, call actions) and the private warning WebSocket with reconnects and a 10 s heartbeat watchdog | Built |
 | Warning experience: chime + three long vibration pulses, spoken clip slot, heads-up notification over other apps, call muted during cues (your mute choice restored) | Built (spoken clips still to record) |
 | Motion: soft screen transitions, breathing waveform, amber panel ease-in with one icon pulse, alert sheet slides up, buttons give on press; all off when Android animations are off | Built |
 | Twilio calling in the app (Voice SDK, push registration, answer/decline/end, mute, speaker) | Built; needs Twilio + Firebase setup |
 | Backend: sign-in, settings, voice token, call actions, app WebSocket, heartbeat | Built |
-| Backend: demo call driver (scripted QR / OTP / harmless / unavailable calls) | Built (DEMO-FAKE) |
-| Backend: call engine (Twilio webhooks, caller media stream, Sarvam STT, phrase engine, assessment, policy) | **Not built yet**: see `docs/build-plan.md` Milestones 1–4 |
+| Backend: demo call driver (scripted QR / OTP / remote access / harmless / unavailable calls, and a `detector` call that runs the plugged-in detection code) | Built (DEMO-FAKE) |
+| Backend: call engine, policy and the detection plug-in sockets (phrase engine, detector, HTTP detector); see `docs/plugins.md` | Built and tested; only example plug-ins so far |
+| Backend: Twilio webhooks, caller media stream, Sarvam STT, the reviewed phrase list, the Sarvam-105B detector | **Not built yet**: see `docs/build-plan.md` Milestones 1–4 |
 | Hindi and Punjabi strings, spoken clips | **To do** by the language speakers (`values-hi/`, `values-pa/`, `res/raw/`) |
 
-Nothing here has been compiled or run yet on the machine it was written on (no Android or Python tooling there). Expect a first-build fix pass.
+The backend tests run (`pytest -q`). The Android app hasn't been compiled yet on the machine it was written on (no Java there). Expect a first-build fix pass.
 
 ## Real vs simulated
 - **Real:** the app, its backend connection, warnings, sounds and haptics, failure handling, Twilio calling code.
-- **Simulated (DEMO-FAKE):** demo accounts, the demo call driver and its scripted callers, the report queue. In the app: the sample people in Contacts and Your circle (`ui/spell/DemoPeople.kt`), and the actions that need them (call a contact, keypad call, block, tell your trusted person, send a test, setup code). These show "Demo only. This isn't connected yet."
+- **Simulated (DEMO-FAKE):** demo accounts, the demo call driver and its scripted callers (including the `detector` scenario's scripted caller lines in `app/demo.py`, which run through the real plug-in sockets and policy), the report queue. The `example` phrase engine and detector are a few keywords for testing the sockets, not the reviewed phrase list or a real detector: never select them at the demo. In the app: the sample people in Contacts and Your circle (`ui/spell/DemoPeople.kt`), and the actions that need them (call a contact, keypad call, block, tell your trusted person, send a test, setup code). These show "Demo only. This isn't connected yet."
 - **Waiting on the backend:** "Put them on hold · 30 s" calls the `hold` action, which answers 501 until the hold flow (architecture section 7) is built; the app then says hold isn't available and never shows the on-hold screen.
 - **Never fake:** a demo call presented as a real phone call, or a pre-triggered warning presented as live detection.
 

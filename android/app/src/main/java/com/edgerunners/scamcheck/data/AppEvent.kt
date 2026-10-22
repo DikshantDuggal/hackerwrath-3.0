@@ -3,7 +3,9 @@ package com.edgerunners.scamcheck.data
 import com.edgerunners.scamcheck.model.EndReason
 import com.edgerunners.scamcheck.model.RequestType
 import com.edgerunners.scamcheck.model.RiskLevel
+import com.edgerunners.scamcheck.model.ThreatSignal
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -21,8 +23,23 @@ sealed interface AppEvent {
 
     data class CallStarted(override val callId: String, override val seq: Int, val fromNumber: String, val demo: Boolean) : CallEvent
     data class Status(override val callId: String, override val seq: Int, val state: String, val reason: String?) : CallEvent
-    data class FirstWarning(override val callId: String, override val seq: Int, val revision: Int, val alertId: String, val requestType: RequestType) : CallEvent
-    data class Confirmed(override val callId: String, override val seq: Int, val revision: Int, val alertId: String, val requestType: RequestType, val level: RiskLevel) : CallEvent
+    data class FirstWarning(
+        override val callId: String,
+        override val seq: Int,
+        val revision: Int,
+        val alertId: String,
+        val requestType: RequestType,
+        val signals: List<ThreatSignal> = emptyList(),
+    ) : CallEvent
+    data class Confirmed(
+        override val callId: String,
+        override val seq: Int,
+        val revision: Int,
+        val alertId: String,
+        val requestType: RequestType,
+        val level: RiskLevel,
+        val signals: List<ThreatSignal> = emptyList(),
+    ) : CallEvent
     data class Cleared(override val callId: String, override val seq: Int, val revision: Int, val alertId: String) : CallEvent
     data class CallEnded(override val callId: String, override val seq: Int, val reason: EndReason) : CallEvent
 }
@@ -55,6 +72,7 @@ object EventParser {
                 o.int("assessment_revision") ?: 0,
                 o.str("alert_id") ?: return null,
                 RequestType.fromWire(o.str("request_type")) ?: return null,
+                o.signals(),
             )
             "confirmed" -> AppEvent.Confirmed(
                 callId, seq,
@@ -62,6 +80,7 @@ object EventParser {
                 o.str("alert_id") ?: return null,
                 RequestType.fromWire(o.str("request_type")) ?: return null,
                 RiskLevel.fromWire(o.str("level")) ?: return null,
+                o.signals(),
             )
             "cleared" -> AppEvent.Cleared(
                 callId, seq,
@@ -71,6 +90,14 @@ object EventParser {
             "call_ended" -> AppEvent.CallEnded(callId, seq, EndReason.fromWire(o.str("reason")) ?: return null)
             else -> null
         }
+    }
+
+    /** Optional, and never a reason to drop the event: unknown or repeated values are left out. */
+    private fun JsonObject.signals(): List<ThreatSignal> {
+        val known = (this["signals"] as? JsonArray).orEmpty()
+            .mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.let { p -> ThreatSignal.fromWire(p.content) } }
+            .toSet()
+        return ThreatSignal.entries.filter { it in known }
     }
 
     private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content

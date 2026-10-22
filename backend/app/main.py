@@ -12,6 +12,18 @@ from fastapi import FastAPI, Header, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
+from detection.adapter import (
+    Detector,
+    PhraseEngine,
+    PluginOptions,
+    RateLimiter,
+    UnknownPlugin,
+    load_plugins,
+    make_detector,
+    make_phrase_engine,
+)
+from engine.session import CallEngine
+
 from . import demo
 from .auth import Auth
 from .config import Config, load_config
@@ -37,6 +49,10 @@ def create_app(config: Config | None = None) -> FastAPI:
     auth = Auth(config)
     store = Store()
     hub = EventHub()
+    # Fail at startup, not mid-call, if a plug-in module named in DETECTION_PLUGINS is missing.
+    load_plugins(config.detection_plugins)
+    plugin_options = PluginOptions(detector_url=config.detector_url, detector_token=config.detector_token)
+    limiter = RateLimiter(config.detector_rate_per_minute)
 
     app = FastAPI(title="Edgerunners backend", docs_url=None, redoc_url=None)
     app.add_middleware(
@@ -65,6 +81,29 @@ def create_app(config: Config | None = None) -> FastAPI:
             if task is not current:
                 task.cancel()
         call.tasks.clear()
+        if call.engine is not None:
+            call.engine.close()
+
+    def plugins() -> tuple[PhraseEngine, Detector]:
+        try:
+            return (
+                make_phrase_engine(config.phrase_engine, plugin_options),
+                make_detector(config.detector_provider, plugin_options),
+            )
+        except (UnknownPlugin, ValueError) as e:
+            log.warning("plug-in unavailable", extra={"code": "plugin_unavailable", "error": type(e).__name__})
+            raise ApiError(503, "detector_not_available", str(e)) from e
+
+    def new_engine(call: CallSession, phrases: PhraseEngine, detector: Detector) -> CallEngine:
+        return CallEngine(
+            call,
+            store.settings_for(call.user_id),
+            hub,
+            phrases,
+            detector,
+            timeout=config.detector_timeout_seconds,
+            limiter=limiter,
+        )
 
     @app.get("/healthz")
     async def healthz() -> dict:
@@ -128,7 +167,9 @@ def create_app(config: Config | None = None) -> FastAPI:
             if call.state == "RINGING":
                 call.state = "ACTIVE"
                 call.tasks.append(asyncio.create_task(demo.heartbeat(hub, call, config)))
-                if call.demo:
+                if call.demo and call.engine is not None:
+                    call.tasks.append(asyncio.create_task(demo.run_detector_script(hub, call, settings, config)))
+                elif call.demo:
                     call.tasks.append(asyncio.create_task(demo.run_scenario(hub, call, settings, config)))
                 # Live calls: the call engine starts analysis from the Twilio media stream.
         elif body.action == "decline":
@@ -144,6 +185,8 @@ def create_app(config: Config | None = None) -> FastAPI:
                 # Live calls: the call engine also ends the Twilio conference.
         elif body.action == "continue":
             call.continued = True
+            if call.engine is not None:
+                call.engine.on_continue()
         elif body.action == "report":
             store.add_report(call, body.request_type)
         else:  # hold / resume: built after ordinary alerts work
@@ -155,7 +198,10 @@ def create_app(config: Config | None = None) -> FastAPI:
         if not config.demo_mode:
             raise ApiError(404, "not_found", "Not found.")
         user_id = auth.user_from_header(authorization)
+        chosen = plugins() if body.scenario == "detector" else None
         call = store.new_call(user_id, demo.DEMO_CALLER, demo=True, scenario=body.scenario)
+        if chosen is not None:
+            call.engine = new_engine(call, *chosen)
         await hub.call_started(call)
         return DemoCallOut(call_id=call.call_id)
 

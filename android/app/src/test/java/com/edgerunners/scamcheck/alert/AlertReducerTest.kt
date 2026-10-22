@@ -4,6 +4,7 @@ import com.edgerunners.scamcheck.data.AppEvent
 import com.edgerunners.scamcheck.model.EndReason
 import com.edgerunners.scamcheck.model.RequestType
 import com.edgerunners.scamcheck.model.RiskLevel
+import com.edgerunners.scamcheck.model.ThreatSignal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -63,6 +64,32 @@ class AlertReducerTest {
         assertTrue(r.state.alertOpen)
         assertEquals(RiskLevel.High, r.state.alert?.level)
         assertTrue(Effect.Speak(RequestType.QrReceive, RiskLevel.High) in r.effects)
+    }
+
+    @Test
+    fun `first warning keeps the signals it was sent`() {
+        val signals = listOf(ThreatSignal.OtpOrPinRequest, ThreatSignal.FinancialSolicitation)
+        val r = AlertReducer.onEvent(inCall(), AppEvent.FirstWarning(call, 2, 0, "al_1", RequestType.PinReceive, signals), 1_000)
+        assertEquals(signals, r.state.alert?.signals)
+    }
+
+    @Test
+    fun `confirmed alert shows the signals of the latest assessment`() {
+        val warned = AlertReducer.onEvent(
+            inCall(), AppEvent.FirstWarning(call, 2, 0, "al_1", RequestType.OtpShare, listOf(ThreatSignal.OtpOrPinRequest)), 1_000,
+        ).state
+        val all = listOf(ThreatSignal.OtpOrPinRequest, ThreatSignal.AuthorityImpersonation, ThreatSignal.AccountSuspensionThreat)
+        val r = AlertReducer.onEvent(warned, AppEvent.Confirmed(call, 3, 1, "al_1", RequestType.OtpShare, RiskLevel.High, all), 3_000)
+        assertEquals(all, r.state.alert?.signals)
+    }
+
+    @Test
+    fun `signals never raise the level`() {
+        val warned = AlertReducer.onEvent(inCall(), AppEvent.FirstWarning(call, 2, 0, "al_1", RequestType.OtpShare), 1_000).state
+        val r = AlertReducer.onEvent(
+            warned, AppEvent.Confirmed(call, 3, 1, "al_1", RequestType.OtpShare, RiskLevel.Possible, ThreatSignal.entries.toList()), 3_000,
+        )
+        assertEquals(RiskLevel.Possible, r.state.alert?.level)
     }
 
     @Test

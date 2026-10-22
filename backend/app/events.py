@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import WebSocket
@@ -16,7 +17,17 @@ from .store import CallSession
 
 log = logging.getLogger("events")
 
-REQUEST_TYPES = frozenset({"qr_receive", "pin_receive", "otp_share"})
+REQUEST_TYPES = frozenset({"qr_receive", "pin_receive", "otp_share", "remote_access"})
+SIGNALS = frozenset(
+    {
+        "otp_or_pin_request",
+        "remote_access",
+        "financial_solicitation",
+        "authority_impersonation",
+        "coercive_threat",
+        "account_suspension_threat",
+    }
+)
 LEVELS = frozenset({"possible", "high"})
 STATES = frozenset({"starting", "monitoring", "degraded", "unavailable", "off"})
 REASONS = frozenset({"stt_down", "detector_down", "behind", "cap_reached"})
@@ -67,31 +78,31 @@ class EventHub:
             payload["reason"] = reason
         return await self._publish(call, payload)
 
-    async def first_warning(self, call: CallSession, alert_id: str, request_type: str) -> dict[str, Any]:
+    async def first_warning(
+        self, call: CallSession, alert_id: str, request_type: str, signals: Sequence[str] = ()
+    ) -> dict[str, Any]:
         _check_request(request_type, "possible")
-        return await self._publish(
-            call,
-            {
-                "type": "first_warning",
-                "assessment_revision": call.revision,
-                "alert_id": alert_id,
-                "request_type": request_type,
-                "level": "possible",
-            },
-        )
+        payload: dict[str, Any] = {
+            "type": "first_warning",
+            "assessment_revision": call.revision,
+            "alert_id": alert_id,
+            "request_type": request_type,
+            "level": "possible",
+        }
+        return await self._publish(call, _with_signals(payload, signals))
 
-    async def confirmed(self, call: CallSession, alert_id: str, request_type: str, level: str) -> dict[str, Any]:
+    async def confirmed(
+        self, call: CallSession, alert_id: str, request_type: str, level: str, signals: Sequence[str] = ()
+    ) -> dict[str, Any]:
         _check_request(request_type, level)
-        return await self._publish(
-            call,
-            {
-                "type": "confirmed",
-                "assessment_revision": call.next_revision(),
-                "alert_id": alert_id,
-                "request_type": request_type,
-                "level": level,
-            },
-        )
+        payload: dict[str, Any] = {
+            "type": "confirmed",
+            "assessment_revision": call.next_revision(),
+            "alert_id": alert_id,
+            "request_type": request_type,
+            "level": level,
+        }
+        return await self._publish(call, _with_signals(payload, signals))
 
     async def cleared(self, call: CallSession, alert_id: str) -> dict[str, Any]:
         return await self._publish(
@@ -102,6 +113,16 @@ class EventHub:
         if reason not in {"user_ended", "caller_ended", "declined"}:
             raise ValueError(f"unknown end reason {reason}")
         return await self._publish(call, {"type": "call_ended", "reason": reason})
+
+
+def _with_signals(payload: dict[str, Any], signals: Sequence[str]) -> dict[str, Any]:
+    """Adds the "What they said" keys when there are any. Unknown keys are a bug, not data."""
+    unknown = [s for s in signals if s not in SIGNALS]
+    if unknown:
+        raise ValueError(f"unknown signals {unknown}")
+    if signals:
+        payload["signals"] = list(dict.fromkeys(signals))
+    return payload
 
 
 def _check_request(request_type: str, level: str) -> None:

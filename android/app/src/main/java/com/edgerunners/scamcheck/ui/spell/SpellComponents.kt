@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -62,6 +64,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -76,6 +79,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.edgerunners.scamcheck.R
+import com.edgerunners.scamcheck.model.ThreatSignal
 import com.edgerunners.scamcheck.ui.Motion
 import com.edgerunners.scamcheck.ui.calmSpec
 import com.edgerunners.scamcheck.ui.giveSpec
@@ -475,7 +480,7 @@ private fun hapFrame(t: Float): Pair<Float, Float> {
 }
 
 /** What the caller asked for, crossed out: a QR code, a code on the screen, or a PIN pad. */
-enum class AskGlyph { Qr, Code, Pin }
+enum class AskGlyph { Qr, Code, Pin, Install }
 
 @Composable
 fun CrossedGlyph(glyph: AskGlyph, color: Color, modifier: Modifier = Modifier) {
@@ -496,6 +501,12 @@ fun CrossedGlyph(glyph: AskGlyph, color: Color, modifier: Modifier = Modifier) {
                 listOf(7f, 12f, 17f).forEach { drawCircle(color, radius = 1.1f * u, center = Offset(it * u, 12f * u)) }
             }
             AskGlyph.Pin -> pinPad(color, u)
+            AskGlyph.Install -> {
+                drawRoundRect(color, Offset(6f * u, 2.5f * u), Size(12f * u, 19f * u), CornerRadius(2.5f * u), style = thin)
+                drawLine(color, Offset(12f * u, 7f * u), Offset(12f * u, 14.5f * u), thin.width, StrokeCap.Round)
+                drawLine(color, Offset(9f * u, 11.5f * u), Offset(12f * u, 14.5f * u), thin.width, StrokeCap.Round)
+                drawLine(color, Offset(15f * u, 11.5f * u), Offset(12f * u, 14.5f * u), thin.width, StrokeCap.Round)
+            }
         }
         drawLine(color, Offset(2f * u, 22f * u), Offset(22f * u, 2f * u), 2.4f * u, StrokeCap.Round)
     }
@@ -506,6 +517,39 @@ private fun DrawScope.pinPad(color: Color, u: Float) {
         if (row == 3 && col != 1) continue
         drawCircle(color, radius = 1.5f * u, center = Offset((6f + col * 6f) * u, (4.5f + row * 5f) * u))
     }
+}
+
+/** The alert's "What they said": a label, then one pill per signal, in the app's own words. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun SignalChips(signals: List<ThreatSignal>, label: Color, chip: Pair<Color, Color>, line: Color? = null, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(999.dp)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Eyebrow(stringResource(R.string.sb_what_they_said), color = label)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            signals.forEach { signal ->
+                Text(
+                    stringResource(signalLabel(signal)),
+                    style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                    color = chip.second,
+                    modifier = Modifier
+                        .clip(shape)
+                        .background(chip.first)
+                        .then(if (line != null) Modifier.border(1.dp, line, shape) else Modifier)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+fun signalLabel(signal: ThreatSignal): Int = when (signal) {
+    ThreatSignal.OtpOrPinRequest -> R.string.signal_otp_or_pin_request
+    ThreatSignal.RemoteAccess -> R.string.signal_remote_access
+    ThreatSignal.FinancialSolicitation -> R.string.signal_financial_solicitation
+    ThreatSignal.AuthorityImpersonation -> R.string.signal_authority_impersonation
+    ThreatSignal.CoerciveThreat -> R.string.signal_coercive_threat
+    ThreatSignal.AccountSuspensionThreat -> R.string.signal_account_suspension_threat
 }
 
 /** Marks a region as one thing for TalkBack. */
