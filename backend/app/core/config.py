@@ -194,7 +194,7 @@ class Settings:
         default_factory=lambda: os.getenv("BRIDGE_SECRET", "").strip()
     )
     telegram_timeout_seconds: float = field(
-        default_factory=lambda: _env_float("TELEGRAM_TIMEOUT_SECONDS", 4.0)
+        default_factory=lambda: _env_float("TELEGRAM_TIMEOUT_SECONDS", 10.0)
     )
 
     @property

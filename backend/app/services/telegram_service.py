@@ -333,13 +333,14 @@ class TelegramAlertService:
             }
 
         try:
-            if self.http_transport is not None:
-                me_resp = self.http_transport("getMe", {})
-            else:
-                me_resp = self._dispatch_http_request("getMe", {})
+            if not self._bot_username:
+                if self.http_transport is not None:
+                    me_resp = self.http_transport("getMe", {})
+                else:
+                    me_resp = self._dispatch_http_request("getMe", {})
 
-            if me_resp.get("ok"):
-                self._bot_username = me_resp.get("result", {}).get("username")
+                if me_resp.get("ok"):
+                    self._bot_username = me_resp.get("result", {}).get("username")
 
             # Try to auto-discover chat_id if not yet set
             discovered_chat_id = None
@@ -360,15 +361,16 @@ class TelegramAlertService:
                         logger.info("Discovered Telegram chat_id '%s'", discovered_chat_id)
                         break
 
+            bot_tag = f"@{self._bot_username}" if self._bot_username else "your bot"
             return {
                 "ok": True,
                 "configured": self.is_configured,
                 "bot_username": self._bot_username,
                 "chat_id": self.settings.telegram_chat_id,
                 "detail": (
-                    f"Connected to @{self._bot_username} (Chat ID: {self.settings.telegram_chat_id})"
+                    f"Connected to {bot_tag} (Chat ID: {self.settings.telegram_chat_id})"
                     if self.settings.telegram_chat_id
-                    else f"Bot @{self._bot_username} is active. Send /start to @{self._bot_username} in Telegram to link your chat ID."
+                    else f"Bot {bot_tag} is active. Send /start to {bot_tag} in Telegram to link your chat ID."
                 ),
             }
         except Exception as exc:
