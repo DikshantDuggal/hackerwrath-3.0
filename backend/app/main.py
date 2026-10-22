@@ -8,6 +8,7 @@ from __future__ import annotations
 from app.api.routes_analysis import router as analysis_router
 from app.api.routes_calls import router as calls_router
 from app.api.routes_health import router as health_router
+from app.api.routes_live_ingest import router as live_ingest_router
 from app.api.routes_telegram import router as telegram_router
 from app.api.routes_transcription import router as transcription_router
 from app.core.compat import FastAPI
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     application.include_router(analysis_router)
     application.include_router(calls_router)
     application.include_router(telegram_router)
+    application.include_router(live_ingest_router)
     return application
 
 

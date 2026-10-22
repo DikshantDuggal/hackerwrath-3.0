@@ -25,6 +25,10 @@ export default defineConfig(() => {
         '/calls': 'http://127.0.0.1:8000',
         '/sync': 'http://127.0.0.1:8000',
         '/telegram': 'http://127.0.0.1:8000',
+        '/internal': {
+          target: 'http://127.0.0.1:8000',
+          ws: true,
+        },
       },
     },
   };

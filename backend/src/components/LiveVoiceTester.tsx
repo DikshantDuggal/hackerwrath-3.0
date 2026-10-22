@@ -11,9 +11,29 @@ import {
   Globe,
   Sparkles,
   Zap,
+  Trash2,
+  Play,
+  Send,
+  ShieldAlert,
+  Flame,
+  PhoneCall,
+  Clock,
 } from 'lucide-react';
 import { audioAlerts } from '../utils/audioAlerts';
 import type { RiskAssessment } from '../hooks/useLiveDetection';
+
+interface StoredUtterance {
+  id: string;
+  text: string;
+  timestamp: number;
+  speaker: string;
+  language: string;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNKNOWN';
+  riskScore: number;
+  flaggedKeywords: string[];
+  safeAction?: string;
+  source: 'microphone' | 'preset' | 'telegram_bridge';
+}
 
 interface LiveVoiceTesterProps {
   onAssessmentUpdate: (assessment: RiskAssessment | null) => void;
@@ -28,101 +48,187 @@ export default function LiveVoiceTester({
 }: LiveVoiceTesterProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [languageCode, setLanguageCode] = useState('auto');
-  const [liveCaptions, setLiveCaptions] = useState<string[]>([]);
-  const [activeSegmentText, setActiveSegmentText] = useState('');
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [statusText, setStatusText] = useState('Ready for live microphone voice detection');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [callId] = useState(() => `mic-live-${Date.now().toString(36)}`);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [storedUtterances, setStoredUtterances] = useState<StoredUtterance[]>([]);
+  const [liveTranscriptPreview, setLiveTranscriptPreview] = useState('');
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isSimulatingTelegram, setIsSimulatingTelegram] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
-  const sliceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const speechRecognitionRef = useRef<any>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopRecording();
+      stopRecordingSync();
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
 
-  const sendAudioChunkToBackend = useCallback(
-    async (blob: Blob) => {
-      if (blob.size < 400) return; // Discard tiny noise
-      setStatusText('Transcribing speech with Sarvam Saaras...');
+  const stopRecordingSync = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch {}
+      speechRecognitionRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    setIsRecording(false);
+    setAudioLevel(0);
+    if (onAudioLevelChange) onAudioLevelChange(0);
+  };
+
+  // Process text through scam detection engine
+  const evaluateTranscript = useCallback(
+    async (
+      text: string,
+      source: 'microphone' | 'preset' | 'telegram_bridge' = 'microphone',
+      confidence: number = 0.95
+    ) => {
+      if (!text.trim()) return;
 
       try {
-        const formData = new FormData();
-        formData.append('file', blob, 'audio.webm');
-        formData.append('language_code', languageCode);
-
-        // Step 1: Speech-To-Text via Sarvam API
-        const transcribeRes = await fetch('/transcribe', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!transcribeRes.ok) {
-          const err = await transcribeRes.json().catch(() => ({}));
-          throw new Error(err.detail || `Sarvam STT failed with HTTP ${transcribeRes.status}`);
-        }
-
-        const data = await transcribeRes.json();
-        const text = (data.transcript || '').trim();
-
-        if (!text) {
-          setStatusText('Listening... (No speech detected in last slice)');
-          return;
-        }
-
-        setActiveSegmentText(text);
-        setLiveCaptions((prev) => [...prev, text]);
-        setStatusText(`Detected (${data.language_code || 'auto'}): "${text.slice(0, 40)}..."`);
-
-        // Step 2: Scam Risk Analysis via Multi-Segment Conversation Manager
-        const segmentRes = await fetch(`/calls/${callId}/segments`, {
+        const res = await fetch(`/calls/${callId}/segments`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text,
+            text: text.trim(),
             speaker: 'caller',
             language_code: languageCode,
             start_seconds: 0,
-            end_seconds: data.duration_seconds || 4,
-            transcript_confidence: data.confidence || 0.94,
+            end_seconds: 4,
+            transcript_confidence: confidence,
           }),
         });
 
-        if (segmentRes.ok) {
-          const update = await segmentRes.json();
-          if (update.assessment) {
-            onAssessmentUpdate(update.assessment);
+        if (res.ok) {
+          const update = await res.json();
+          const assessment: RiskAssessment = update.assessment;
+          if (assessment) {
+            onAssessmentUpdate(assessment);
 
-            if (update.assessment.risk_level === 'HIGH' || update.assessment.risk_level === 'CRITICAL') {
+            const keywords = (assessment.rule_analysis?.triggered_indicators || []).map(
+              (i: any) => i.keyword_or_pattern
+            );
+
+            // Add to temporary speech history
+            const newUtterance: StoredUtterance = {
+              id: `utt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              text: text.trim(),
+              timestamp: Date.now(),
+              speaker: 'caller',
+              language: languageCode,
+              riskLevel: assessment.risk_level,
+              riskScore: assessment.risk_score,
+              flaggedKeywords: keywords,
+              safeAction: assessment.recommended_action,
+              source,
+            };
+
+            setStoredUtterances((prev) => [newUtterance, ...prev]);
+
+            // Audio Alert
+            if (assessment.risk_level === 'HIGH' || assessment.risk_level === 'CRITICAL') {
               audioAlerts.playHighRiskAlert();
-            } else if (update.assessment.risk_level === 'MEDIUM') {
+            } else if (assessment.risk_level === 'MEDIUM') {
               audioAlerts.playCautionAlert();
             } else {
               audioAlerts.playSafeChime();
             }
+
+            setStatusText(
+              `Analyzed: "${text.slice(0, 35)}..." → ${assessment.risk_level} (${Math.round(
+                assessment.risk_score
+              )}/100)`
+            );
           }
         }
       } catch (err: any) {
-        console.error('STT Pipeline error:', err);
-        setErrorMsg(err.message || 'Error communicating with Sarvam AI backend');
-        setStatusText('Error transcribing audio');
+        console.error('Error evaluating transcript:', err);
+        setErrorMsg('Error evaluating speech with detection engine');
       }
     },
     [callId, languageCode, onAssessmentUpdate]
   );
 
+  // Send recorded Audio Blob to Sarvam STT
+  const transcribeAudioBlob = useCallback(
+    async (blob: Blob, liveFallbackText?: string) => {
+      setIsTranscribing(true);
+      setStatusText('Transcribing audio via Sarvam Saaras AI...');
+
+      try {
+        const formData = new FormData();
+        formData.append('file', blob, 'recording.webm');
+        formData.append('language_code', languageCode);
+
+        const transcribeRes = await fetch('/transcribe', {
+          method: 'POST',
+          body: formData,
+        });
+
+        let transcript = '';
+        let confidence = 0.94;
+
+        if (transcribeRes.ok) {
+          const data = await transcribeRes.json();
+          transcript = (data.transcript || '').trim();
+          confidence = data.confidence || 0.94;
+        }
+
+        // If Sarvam returned empty (or failed due to short audio), use Web Speech live preview as fallback
+        if (!transcript && liveFallbackText && liveFallbackText.trim()) {
+          transcript = liveFallbackText.trim();
+        }
+
+        if (transcript) {
+          await evaluateTranscript(transcript, 'microphone', confidence);
+        } else {
+          setStatusText('No speech could be transcribed from the recording.');
+        }
+      } catch (err: any) {
+        console.warn('Sarvam STT error, trying live preview fallback:', err);
+        if (liveFallbackText && liveFallbackText.trim()) {
+          await evaluateTranscript(liveFallbackText.trim(), 'microphone', 0.92);
+        } else {
+          setErrorMsg(err.message || 'Sarvam STT failed to transcribe speech.');
+          setStatusText('Transcription error');
+        }
+      } finally {
+        setIsTranscribing(false);
+      }
+    },
+    [evaluateTranscript, languageCode]
+  );
+
+  // Start Live Microphone Recording
   const startRecording = async () => {
     setErrorMsg(null);
+    setLiveTranscriptPreview('');
+    setRecordingSeconds(0);
+    chunksRef.current = [];
     audioAlerts.playClick();
 
     try {
@@ -135,8 +241,10 @@ export default function LiveVoiceTester({
       });
       streamRef.current = stream;
 
-      // Setup audio analyzer for waveform and volume
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      // Audio Context for Volume Waveform
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const actx = new AudioCtx();
       audioContextRef.current = actx;
       const source = actx.createMediaStreamSource(stream);
@@ -145,15 +253,12 @@ export default function LiveVoiceTester({
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      // Monitor audio volume
       const buffer = new Uint8Array(analyser.frequencyBinCount);
       const updateLevel = () => {
         if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(buffer);
         let sum = 0;
-        for (let i = 0; i < buffer.length; i++) {
-          sum += buffer[i];
-        }
+        for (let i = 0; i < buffer.length; i++) sum += buffer[i];
         const avg = sum / buffer.length / 255;
         setAudioLevel(avg);
         if (onAudioLevelChange) onAudioLevelChange(avg);
@@ -161,88 +266,166 @@ export default function LiveVoiceTester({
       };
       updateLevel();
 
-      // Setup MediaRecorder
+      // Browser Web Speech recognition for instant zero-latency preview
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognizer = new SpeechRecognition();
+          recognizer.continuous = true;
+          recognizer.interimResults = true;
+          recognizer.lang =
+            languageCode === 'hi-IN'
+              ? 'hi-IN'
+              : languageCode === 'pa-IN'
+              ? 'pa-IN'
+              : languageCode === 'en-IN'
+              ? 'en-IN'
+              : 'hi-IN';
+          recognizer.onresult = (event: any) => {
+            let current = '';
+            for (let i = 0; i < event.results.length; i++) {
+              current += event.results[i][0].transcript + ' ';
+            }
+            setLiveTranscriptPreview(current.trim());
+          };
+          recognizer.start();
+          speechRecognitionRef.current = recognizer;
+        } catch (e) {
+          console.warn('Web Speech recognizer init skipped:', e);
+        }
+      }
+
+      // MediaRecorder for high-fidelity audio capture to Sarvam STT
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : 'audio/webm';
 
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
-      recordedChunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          recordedChunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
         }
       };
 
-      recorder.start();
+      recorder.start(500); // 500ms chunking
       setIsRecording(true);
       setStatusText('Listening live... speak clearly in Hindi, English, or Punjabi');
 
-      // Periodic slice slice every 4.5 seconds
-      sliceTimerRef.current = setInterval(() => {
-        if (recorder.state === 'recording') {
-          recorder.stop();
-          setTimeout(() => {
-            const blob = new Blob(recordedChunksRef.current, { type: mimeType });
-            recordedChunksRef.current = [];
-            sendAudioChunkToBackend(blob);
-
-            // Restart recorder on active stream
-            if (streamRef.current && streamRef.current.active) {
-              try {
-                const newRec = new MediaRecorder(streamRef.current, { mimeType });
-                mediaRecorderRef.current = newRec;
-                newRec.ondataavailable = (e) => {
-                  if (e.data.size > 0) recordedChunksRef.current.push(e.data);
-                };
-                newRec.start();
-              } catch {
-                // Stream stopped
-              }
-            }
-          }, 100);
-        }
-      }, 4500);
+      // Recording timer
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Microphone access denied or unavailable');
+      setErrorMsg(err.message || 'Microphone access denied or unavailable.');
       setIsRecording(false);
     }
   };
 
+  // Stop Recording & Send Audio to Backend
   const stopRecording = () => {
     audioAlerts.playClick();
-    if (sliceTimerRef.current) {
-      clearInterval(sliceTimerRef.current);
-      sliceTimerRef.current = null;
-    }
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-    }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
+    const recorder = mediaRecorderRef.current;
+    const fallbackText = liveTranscriptPreview;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
 
-    setIsRecording(false);
-    setAudioLevel(0);
-    if (onAudioLevelChange) onAudioLevelChange(0);
-    setStatusText('Microphone paused');
-
-    // Flush final chunk
-    if (recordedChunksRef.current.length > 0) {
-      const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
-      recordedChunksRef.current = [];
-      sendAudioChunkToBackend(blob);
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch {}
+      speechRecognitionRef.current = null;
     }
+
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        chunksRef.current = [];
+        stopRecordingSync();
+        transcribeAudioBlob(blob, fallbackText);
+      };
+      recorder.stop();
+    } else {
+      stopRecordingSync();
+      if (fallbackText) {
+        evaluateTranscript(fallbackText, 'microphone');
+      }
+    }
+  };
+
+  // Test Simulation of Telegram VoIP Call Bridge
+  const handleTestTelegramBridge = async () => {
+    setIsSimulatingTelegram(true);
+    setStatusText('Testing Telegram VoIP Call Bridge Spike...');
+    try {
+      const res = await fetch('/internal/live/spike', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript:
+            'Hello sir, I am calling from bank headquarters. Your account is blocked today. Share the 6-digit OTP immediately.',
+          customer_name: 'Telegram Audio Caller',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const assessment = data.assessment;
+        onAssessmentUpdate(assessment);
+
+        const newUtterance: StoredUtterance = {
+          id: `utt_tg_${Date.now()}`,
+          text: data.customer_name + ': ' + 'Your account is blocked today. Share the 6-digit OTP immediately.',
+          timestamp: Date.now(),
+          speaker: 'telegram_caller',
+          language: 'mixed',
+          riskLevel: assessment.risk_level,
+          riskScore: assessment.risk_score,
+          flaggedKeywords: data.flagged_keywords || ['OTP', 'ACCOUNT_SUSPENSION'],
+          safeAction: assessment.recommended_action,
+          source: 'telegram_bridge',
+        };
+
+        setStoredUtterances((prev) => [newUtterance, ...prev]);
+        audioAlerts.playHighRiskAlert();
+        setStatusText('Telegram VoIP Call Bridge Spike: Successfully intercepted & flagged!');
+      }
+    } catch (err: any) {
+      setErrorMsg('Failed to test Telegram bridge spike: ' + err.message);
+    } finally {
+      setIsSimulatingTelegram(false);
+    }
+  };
+
+  // Highlight flagged keywords in text
+  const renderHighlightedText = (text: string, keywords: string[]) => {
+    if (!keywords || keywords.length === 0) return text;
+    const escaped = keywords
+      .filter(Boolean)
+      .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|');
+    if (!escaped) return text;
+
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    const parts = text.split(regex);
+
+    return parts.map((part, i) =>
+      regex.test(part) ? (
+        <span
+          key={i}
+          className="px-1.5 py-0.5 rounded bg-red-500/30 text-red-200 border border-red-500/40 font-bold mx-0.5"
+        >
+          {part}
+        </span>
+      ) : (
+        part
+      )
+    );
   };
 
   return (
@@ -255,7 +438,7 @@ export default function LiveVoiceTester({
             <h2 className="text-lg font-bold gradient-text">Live Microphone Voice Shield</h2>
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Powered by Sarvam AI Saaras (v3) Speech-To-Text & Real-Time Negation Guard
+            Real-Time Speech Ingestion, Temporary Memory & Immediate Scam Keyword Flagging
           </p>
         </div>
 
@@ -277,7 +460,7 @@ export default function LiveVoiceTester({
       </div>
 
       {/* Main Mic Control + Visualizer */}
-      <div className="flex flex-col items-center justify-center py-6 text-center space-y-5">
+      <div className="flex flex-col items-center justify-center py-4 text-center space-y-4">
         <div className="relative">
           {/* Animated Waveform rings */}
           {isRecording && (
@@ -296,23 +479,32 @@ export default function LiveVoiceTester({
           {/* Central Mic Button */}
           <button
             onClick={isRecording ? stopRecording : startRecording}
+            disabled={isTranscribing}
             className={`
-              relative z-10 w-28 h-28 rounded-full flex items-center justify-center shadow-2xl
-              transition-all duration-500 transform hover:scale-105 active:scale-95
+              relative z-10 w-28 h-28 rounded-full flex flex-col items-center justify-center shadow-2xl
+              transition-all duration-300 transform hover:scale-105 active:scale-95 cursor-pointer
               ${
                 isRecording
-                  ? 'bg-gradient-to-tr from-red-600 via-rose-600 to-red-500 text-white shadow-[0_0_50px_rgba(239,68,68,0.5)]'
+                  ? 'bg-gradient-to-tr from-red-600 via-rose-600 to-red-500 text-white shadow-[0_0_50px_rgba(239,68,68,0.5)] animate-pulse'
                   : 'bg-gradient-to-tr from-[var(--purple-dim)] via-[var(--purple-glow)] to-[var(--green-accent)] text-white shadow-[0_0_40px_rgba(168,85,247,0.35)]'
               }
             `}
+            title={isRecording ? 'Click to Stop and Analyze' : 'Click to Speak'}
           >
-            {isRecording ? <MicOff className="w-12 h-12" /> : <Mic className="w-12 h-12" />}
+            {isRecording ? <MicOff className="w-10 h-10" /> : <Mic className="w-10 h-10" />}
+            <span className="text-[10px] font-mono mt-1 font-bold uppercase">
+              {isRecording ? `${recordingSeconds}s Stop` : 'Click to Talk'}
+            </span>
           </button>
         </div>
 
         <div>
           <h3 className="text-xl font-bold text-white">
-            {isRecording ? 'Listening & Protecting Call...' : 'Tap Mic to Start Protection'}
+            {isRecording
+              ? 'Listening to Speech... Click when done'
+              : isTranscribing
+              ? 'Transcribing & Evaluating Risk...'
+              : 'Tap Mic to Speak & Check Keywords'}
           </h3>
           <p className="text-xs text-[var(--text-muted)] mt-1 max-w-md mx-auto">{statusText}</p>
         </div>
@@ -328,7 +520,7 @@ export default function LiveVoiceTester({
                 style={{
                   height: `${isRecording ? h : 3}px`,
                   background:
-                    activeRisk?.risk_level === 'HIGH'
+                    activeRisk?.risk_level === 'HIGH' || activeRisk?.risk_level === 'CRITICAL'
                       ? '#ef4444'
                       : isRecording
                       ? '#34d399'
@@ -338,76 +530,210 @@ export default function LiveVoiceTester({
             );
           })}
         </div>
+
+        {/* Live speech interim preview while speaking */}
+        {isRecording && liveTranscriptPreview && (
+          <div className="w-full max-w-lg p-3 rounded-xl glass border-purple-500/30 bg-purple-950/20 text-xs text-white/90 animate-slide-up">
+            <span className="text-[10px] font-mono text-[var(--purple-candle)] block mb-1">
+              🎙️ Live Speech Interim Preview:
+            </span>
+            <p className="italic">{liveTranscriptPreview}</p>
+          </div>
+        )}
       </div>
 
       {/* Error alert if any */}
       {errorMsg && (
-        <div className="glass p-4 rounded-xl border-red-500/30 bg-red-950/20 text-red-300 text-xs flex items-center gap-2">
-          <AlertOctagon className="w-4 h-4 flex-shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="glass p-4 rounded-xl border-red-500/30 bg-red-950/20 text-red-300 text-xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertOctagon className="w-4 h-4 flex-shrink-0 text-red-400" />
+            <span>{errorMsg}</span>
+          </div>
+          <button
+            onClick={() => setErrorMsg(null)}
+            className="text-[11px] underline text-red-300 hover:text-white"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
-      {/* Real-Time Live Transcript & Detected Keywords */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-        {/* Left: Active Captions */}
-        <div className="glass p-4 rounded-2xl space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-secondary)]">
-            <span>🗣️ Live Saaras Captions</span>
-            {isRecording && <span className="text-emerald-400 text-[10px]">● Live Stream</span>}
-          </div>
-
-          <div className="h-32 overflow-y-auto space-y-2 pr-1 text-xs">
-            {liveCaptions.length === 0 ? (
-              <p className="text-[var(--text-muted)] italic text-center py-10">
-                Transcribed caller phrases will stream here in real-time...
-              </p>
-            ) : (
-              liveCaptions.map((cap, i) => (
-                <div key={i} className="p-2 rounded-lg bg-white/5 border border-white/5 text-white/90">
-                  {cap}
-                </div>
-              ))
-            )}
-          </div>
+      {/* Quick Speech Simulator Presets */}
+      <div className="glass p-4 rounded-2xl border-white/10 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            One-Click Voice Test Phrases (Immediate Keyword Flagging)
+          </span>
+          <span className="text-[10px] text-[var(--text-muted)] font-mono">Instant Test</span>
         </div>
 
-        {/* Right: Active Risk Status */}
-        <div className="glass p-4 rounded-2xl flex flex-col justify-between">
-          <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-secondary)] mb-2">
-            <span>🛡️ Threat Assessment</span>
-            <span
-              className={`font-mono text-[10px] px-2 py-0.5 rounded-full border ${
-                activeRisk?.risk_level === 'CRITICAL'
-                  ? 'bg-rose-500/30 text-rose-300 border-rose-500/50 animate-pulse'
-                  : activeRisk?.risk_level === 'HIGH'
-                  ? 'bg-red-500/20 text-red-400 border-red-500/40'
-                  : activeRisk?.risk_level === 'MEDIUM'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-              }`}
-            >
-              {activeRisk?.risk_level || 'MONITORING'}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <button
+            onClick={() =>
+              evaluateTranscript('Sir, please share your 6 digit OTP right now to verify account.', 'preset')
+            }
+            className="p-2.5 rounded-xl glass hover:bg-white/10 text-left border-red-500/20 hover:border-red-500/40 text-red-200 transition-all flex items-center justify-between"
+          >
+            <span className="line-clamp-1">🚨 "Sir, please share your 6-digit OTP right now"</span>
+            <Play className="w-3 h-3 flex-shrink-0 text-red-400 fill-current ml-2" />
+          </button>
+
+          <button
+            onClick={() =>
+              evaluateTranscript('Your bank account is blocked, give me your UPI PIN immediately.', 'preset')
+            }
+            className="p-2.5 rounded-xl glass hover:bg-white/10 text-left border-red-500/20 hover:border-red-500/40 text-red-200 transition-all flex items-center justify-between"
+          >
+            <span className="line-clamp-1">🚨 "Account is blocked, give me your UPI PIN"</span>
+            <Play className="w-3 h-3 flex-shrink-0 text-red-400 fill-current ml-2" />
+          </button>
+
+          <button
+            onClick={() =>
+              evaluateTranscript('You are under digital arrest by CBI Mumbai. Non-bailable warrant issued.', 'preset')
+            }
+            className="p-2.5 rounded-xl glass hover:bg-white/10 text-left border-rose-500/20 hover:border-rose-500/40 text-rose-200 transition-all flex items-center justify-between"
+          >
+            <span className="line-clamp-1">🚨 "Digital arrest by CBI, arrest warrant issued"</span>
+            <Play className="w-3 h-3 flex-shrink-0 text-rose-400 fill-current ml-2" />
+          </button>
+
+          <button
+            onClick={() =>
+              evaluateTranscript('Hello, I want to check my account balance and get a mini statement.', 'preset')
+            }
+            className="p-2.5 rounded-xl glass hover:bg-white/10 text-left border-emerald-500/20 hover:border-emerald-500/40 text-emerald-200 transition-all flex items-center justify-between"
+          >
+            <span className="line-clamp-1">✅ "Hello, I want to check my account balance" (Safe)</span>
+            <Play className="w-3 h-3 flex-shrink-0 text-emerald-400 fill-current ml-2" />
+          </button>
+        </div>
+      </div>
+
+      {/* Telegram VoIP Voice Call Bridge Card (ashboi005/onfloor) */}
+      <div className="glass p-4 rounded-2xl border-purple-500/30 bg-purple-950/15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <PhoneCall className="w-4 h-4 text-[var(--purple-bright)]" />
+            <span className="text-xs font-semibold text-white">Telegram VoIP Call Bridge (onfloor)</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              WS: /internal/live/ingest
             </span>
           </div>
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-white">
-              {activeRisk?.caption || 'Awaiting caller speech for fraud intent parsing...'}
-            </p>
-            {activeRisk?.recommended_action && (
-              <p className="text-xs text-[var(--green-accent)]">
-                <span className="font-semibold">Action: </span>
-                {activeRisk.recommended_action}
-              </p>
-            )}
-          </div>
-
-          <div className="pt-2 text-[10px] text-[var(--text-muted)] flex items-center justify-between border-t border-white/5 mt-2">
-            <span>Score: {Math.round((activeRisk?.risk_score || 0) > 1 ? (activeRisk?.risk_score || 0) : (activeRisk?.risk_score || 0) * 100)}/100</span>
-            <span>Confidence: {Math.round(((activeRisk?.confidence ?? 0.9) > 1 ? (activeRisk?.confidence ?? 0.9) : (activeRisk?.confidence ?? 0.9) * 100))}%</span>
-          </div>
+          <p className="text-[11px] text-[var(--text-muted)]">
+            Connects live Telegram VoIP phone calls from <code>py-tgcalls</code> directly into the scam detection engine.
+          </p>
         </div>
+
+        <button
+          onClick={handleTestTelegramBridge}
+          disabled={isSimulatingTelegram}
+          className="px-3.5 py-1.5 rounded-xl glass hover:bg-white/10 text-xs font-medium text-[var(--purple-candle)] border border-[var(--purple-border)] flex items-center gap-1.5 transition-all flex-shrink-0"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span>{isSimulatingTelegram ? 'Testing...' : 'Test Telegram Bridge Call'}</span>
+        </button>
+      </div>
+
+      {/* Temporarily Stored Speech & Keyword Detection History */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-2">
+            <Clock className="w-3.5 h-3.5 text-[var(--green-accent)]" />
+            Temporarily Stored Speech & Flagged Keywords ({storedUtterances.length})
+          </span>
+
+          {storedUtterances.length > 0 && (
+            <button
+              onClick={() => setStoredUtterances([])}
+              className="text-[11px] text-[var(--text-muted)] hover:text-white flex items-center gap-1 hover:underline"
+            >
+              <Trash2 className="w-3 h-3" />
+              Clear Temporary Storage
+            </button>
+          )}
+        </div>
+
+        {storedUtterances.length === 0 ? (
+          <div className="glass p-8 rounded-2xl text-center text-xs text-[var(--text-muted)] italic">
+            No speech has been recorded yet. Click the mic button above, say a phrase (e.g. "tell me your OTP"), and your spoken words will appear here with highlighted keywords!
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+            {storedUtterances.map((utt) => {
+              const isDanger = utt.riskLevel === 'HIGH' || utt.riskLevel === 'CRITICAL';
+              const isCaution = utt.riskLevel === 'MEDIUM';
+
+              return (
+                <div
+                  key={utt.id}
+                  className={`p-4 rounded-2xl glass border transition-all animate-slide-up ${
+                    isDanger
+                      ? 'border-red-500/40 bg-red-950/20 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
+                      : isCaution
+                      ? 'border-amber-500/40 bg-amber-950/20'
+                      : 'border-white/10 bg-white/[0.02]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-2 font-mono">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--green-accent)]" />
+                      <span>{new Date(utt.timestamp).toLocaleTimeString()}</span>
+                      <span className="text-white/40">·</span>
+                      <span className="uppercase text-[10px] text-white/60">{utt.source}</span>
+                    </span>
+
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-bold text-[10px] border ${
+                        utt.riskLevel === 'CRITICAL'
+                          ? 'bg-rose-500/30 text-rose-300 border-rose-500/50'
+                          : isDanger
+                          ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                          : isCaution
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      }`}
+                    >
+                      {utt.riskLevel} ({Math.round(utt.riskScore)}/100)
+                    </span>
+                  </div>
+
+                  {/* Spoken Text with Keyword Highlighting */}
+                  <p className="text-sm font-medium text-white leading-relaxed mb-2">
+                    {renderHighlightedText(utt.text, utt.flaggedKeywords)}
+                  </p>
+
+                  {/* Flagged Keywords Pills */}
+                  {utt.flaggedKeywords && utt.flaggedKeywords.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap mt-2 pt-2 border-t border-white/5">
+                      <span className="text-[10px] font-mono text-red-400 font-semibold flex items-center gap-1">
+                        <Flame className="w-3 h-3 text-red-400" />
+                        Flagged Threats:
+                      </span>
+                      {utt.flaggedKeywords.map((kw, i) => (
+                        <span
+                          key={i}
+                          className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40"
+                        >
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Recommended Action */}
+                  {utt.safeAction && isDanger && (
+                    <div className="mt-2 text-xs text-amber-300 bg-black/40 p-2 rounded-xl flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                      <span>{utt.safeAction}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

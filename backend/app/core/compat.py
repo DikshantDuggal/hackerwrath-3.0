@@ -161,11 +161,24 @@ def _serialize_value(val: Any) -> Any:
 
 
 try:
-    from fastapi import APIRouter, Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile, status  # type: ignore
+    from fastapi import APIRouter, Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect, status  # type: ignore
     from fastapi.responses import JSONResponse  # type: ignore
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
+
+    class WebSocket:  # type: ignore
+        async def accept(self) -> None: pass
+        async def receive_text(self) -> str: return ""
+        async def receive_bytes(self) -> bytes: return b""
+        async def receive(self) -> Dict[str, Any]: return {}
+        async def send_text(self, data: str) -> None: pass
+        async def send_json(self, data: Any) -> None: pass
+        async def close(self, code: int = 1000) -> None: pass
+
+    class WebSocketDisconnect(Exception):  # type: ignore
+        def __init__(self, code: int = 1000) -> None:
+            self.code = code
 
     class status:  # type: ignore
         HTTP_200_OK = 200
@@ -261,6 +274,11 @@ except ImportError:
 
         def delete(self, path: str, status_code: int = 200, response_model: Any = None, **kwargs: Any) -> Callable[..., Any]:
             return self._add("DELETE", path, status_code=status_code, response_model=response_model)
+
+        def websocket(self, path: str, **kwargs: Any) -> Callable[..., Any]:
+            def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+                return fn
+            return decorator
 
     class FastAPI(APIRouter):  # type: ignore
         def __init__(self, title: str = "FastAPI", version: str = "1.0.0", description: str = "", **kwargs: Any) -> None:

@@ -23,6 +23,7 @@ class RulePatternDef:
     pattern_label: str
     phrases: Tuple[str, ...]
     explanation: str
+    regex: Optional[re.Pattern] = None
 
 
 # Protective / negation / legitimate expressions that MUST NOT be flagged as scam requests
@@ -89,11 +90,46 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
 )
 
 
+REGEX_OTP_SOLICITATION = re.compile(
+    r"\b(what is|whats|batao|bata|dasso|das|share|tell|give|enter|send|provide|input|type|confirm|verify|daalo|daal|bhejo|bhej|likho|bolo|read out|boliye|bataiye|need)\b.*?\b(otp|pin|upi pin|password|passcode|cvv|code|verification code)\b"
+    r"|\b(otp|pin|upi pin|password|passcode|cvv|code|verification code)\b.*?\b(batao|bata|dasso|das|share|tell|give|enter|send|provide|daalo|daal|bhejo|bhej|likho|bolo|chahiye|de do|bata do|dass do|verify|confirm|karo|bataiye)\b"
+    r"|(?:ओटीपी|पिन|पासवर्ड|सीवीवी).*(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर)|(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर).*(?:ओटीपी|पिन|पासवर्ड|सीवीवी)"
+    r"|(?:ਓਟੀਪੀ|ਪਿੰਨ).*(?:ਦੱਸੋ|ਦੱਸ|ਪਾਓ|ਭੇਜੋ)|(?:ਦੱਸੋ|ਦੱਸ|ਪਾਓ|ਭੇਜੋ).*(?:ਓਟੀਪੀ|ਪਿੰਨ)",
+    re.IGNORECASE,
+)
+
+REGEX_ACCOUNT_SUSPENSION = re.compile(
+    r"\b(account|khata|sim|sim card|card|bank account|kyc|electricity|debit card)\b.*?\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band|expired|disconnect|disconnected)\b"
+    r"|\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band)\b.*?\b(account|khata|sim|card|kyc)\b"
+    r"|(?:खाता|अकाउंट|सिम|केवाईसी).*(?:बंद|ब्लॉक|सस्पेंड|फ्रीज)|(?:बंद|ब्लॉक|सस्पेंड|फ्रीज).*(?:खाता|अकाउंट|सिम|केवाईसी)"
+    r"|(?:ਖਾਤਾ|ਅਕਾਊਂਟ|ਸਿਮ).*(?:ਬੰਦ|ਬਲਾਕ)|(?:ਬੰਦ|ਬਲਾਕ).*(?:ਖਾਤਾ|ਅਕਾਊਂਟ|ਸਿਮ)",
+    re.IGNORECASE,
+)
+
+REGEX_REMOTE_ACCESS = re.compile(
+    r"\b(download|install|open|chalao|khol|share screen|screen share)\b.*?\b(anydesk|teamviewer|quicksupport|rustdesk|screen share)\b"
+    r"|\b(anydesk|teamviewer|quicksupport|rustdesk)\b.*?\b(download|install|open|karo|daalo|kar lo)\b",
+    re.IGNORECASE,
+)
+
+REGEX_QR_LURE = re.compile(
+    r"\b(scan|scanner)\b.*?\b(qr|qr code)\b.*?\b(receive|money|paise|payment|credit)\b"
+    r"|\b(qr|qr code)\b.*?\b(scan|scanner)\b.*?\b(paise|payment|receive|aayenge|aa jayega)\b",
+    re.IGNORECASE,
+)
+
+REGEX_LEGAL_THREAT = re.compile(
+    r"\b(digital arrest|arrest warrant|non bailable|cbi|police station|narcotics bureau|crime branch|cyber crime|fir filed|customs seizure)\b",
+    re.IGNORECASE,
+)
+
+
 RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
     RulePatternDef(
         rule_id="RULE_OTP_PIN_SOLICITATION",
         category="OTP_OR_PIN_REQUEST",
         pattern_label="otp_or_pin_solicitation",
+        regex=REGEX_OTP_SOLICITATION,
         phrases=(
             "share the otp",
             "share your otp",
@@ -137,6 +173,7 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
         rule_id="RULE_QR_SCAN_RECEIVE_LURE",
         category="QR_SCAN_TO_RECEIVE_MONEY",
         pattern_label="qr_scan_to_receive",
+        regex=REGEX_QR_LURE,
         phrases=(
             "scan it and the money comes",
             "scan this qr code to receive",
@@ -160,6 +197,7 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
         rule_id="RULE_REMOTE_ACCESS_APP",
         category="REMOTE_ACCESS_OR_SCREEN_SHARE",
         pattern_label="remote_access_screen_share",
+        regex=REGEX_REMOTE_ACCESS,
         phrases=(
             "install anydesk",
             "download anydesk",
@@ -182,6 +220,7 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
         rule_id="RULE_ARREST_OR_LEGAL_THREAT",
         category="THREAT_ARREST_OR_LEGAL_ACTION",
         pattern_label="arrest_or_legal_threat",
+        regex=REGEX_LEGAL_THREAT,
         phrases=(
             "digital arrest",
             "arrest warrant",
@@ -206,6 +245,7 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
         rule_id="RULE_ACCOUNT_SUSPENSION_THREAT",
         category="ACCOUNT_SUSPENSION_THREAT",
         pattern_label="account_or_kyc_block_threat",
+        regex=REGEX_ACCOUNT_SUSPENSION,
         phrases=(
             "account will be blocked",
             "account will be suspended",
@@ -393,39 +433,52 @@ class RulesEngine:
 
             # 2. Evaluate structured rule definitions on this clause
             for rule_def in RULE_DEFINITIONS:
-                for phrase in rule_def.phrases:
-                    norm_phrase = normalise_text(phrase)
-                    if norm_phrase and norm_phrase in norm_clause:
-                        dedup_key = f"{rule_def.rule_id}:{rule_def.pattern_label}"
-                        if dedup_key in seen:
-                            duplicate_count += 1
+                matched_keyword: Optional[str] = None
+
+                # A. Check regex pattern if available
+                if rule_def.regex is not None:
+                    m = rule_def.regex.search(norm_clause)
+                    if m:
+                        matched_keyword = m.group(0).strip()
+
+                # B. Check exact phrase catalog
+                if not matched_keyword:
+                    for phrase in rule_def.phrases:
+                        norm_phrase = normalise_text(phrase)
+                        if norm_phrase and norm_phrase in norm_clause:
+                            matched_keyword = phrase
                             break
 
-                        seen.add(dedup_key)
-                        raw_w = float(self.weights.get(rule_def.category, 30.0))
-                        weight = raw_w * 100.0 if 0.0 < raw_w <= 1.0 else raw_w
-                        triggered.append(
-                            TriggeredIndicator(
-                                rule_id=rule_def.rule_id,
-                                category=rule_def.category,
-                                keyword_or_pattern=phrase,
-                                weight=weight,
-                                excerpt=clause[:200],
-                                start_seconds=start_seconds,
-                                end_seconds=end_seconds,
-                                synced_across_calls=False,
-                                explanation=rule_def.explanation,
-                            )
+                if matched_keyword:
+                    dedup_key = f"{rule_def.rule_id}:{rule_def.pattern_label}"
+                    if dedup_key in seen:
+                        duplicate_count += 1
+                        continue
+
+                    seen.add(dedup_key)
+                    raw_w = float(self.weights.get(rule_def.category, 30.0))
+                    weight = raw_w * 100.0 if 0.0 < raw_w <= 1.0 else raw_w
+                    triggered.append(
+                        TriggeredIndicator(
+                            rule_id=rule_def.rule_id,
+                            category=rule_def.category,
+                            keyword_or_pattern=matched_keyword,
+                            weight=weight,
+                            excerpt=clause[:200],
+                            start_seconds=start_seconds,
+                            end_seconds=end_seconds,
+                            synced_across_calls=False,
+                            explanation=rule_def.explanation,
                         )
-                        # Sync high-signal phrase to cross-call KeywordSyncService if call_id provided
-                        if call_id and weight >= 40.0:
-                            self.keyword_sync.register_or_sync_keyword(
-                                keyword=norm_phrase,
-                                category=rule_def.category,
-                                weight=min(40.0, weight),
-                                source_call_id=call_id,
-                            )
-                        break
+                    )
+                    # Sync high-signal phrase to cross-call KeywordSyncService if call_id provided
+                    if call_id and weight >= 40.0:
+                        self.keyword_sync.register_or_sync_keyword(
+                            keyword=normalise_text(matched_keyword),
+                            category=rule_def.category,
+                            weight=min(40.0, weight),
+                            source_call_id=call_id,
+                        )
 
             # 3. Check cross-call synchronized keywords
             for sync_entry in self.keyword_sync.get_active_keywords():

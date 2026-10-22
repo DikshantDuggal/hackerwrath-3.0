@@ -850,6 +850,56 @@ class ScamCallBackendTestSuite(unittest.TestCase):
         self.assertFalse(manual_alert_resp.json()["delivered"])
         self.assertEqual(manual_alert_resp.json()["status"], "UNAUTHORIZED")
 
+    # -------------------------------------------------------------------------
+    # 24. NATURAL SPOKEN SCAM PHRASES & KEYWORD FLAGGING
+    # -------------------------------------------------------------------------
+    def test_24_natural_speech_keyword_solicitation_flagging(self) -> None:
+        """Verifies natural speech variations of OTP, PIN, and account block are reliably flagged."""
+        test_phrases = [
+            ("what is your otp", "OTP_OR_PIN_REQUEST"),
+            ("please tell otp quickly", "OTP_OR_PIN_REQUEST"),
+            ("send me the otp right now", "OTP_OR_PIN_REQUEST"),
+            ("batao otp abhi", "OTP_OR_PIN_REQUEST"),
+            ("apna pin batao", "OTP_OR_PIN_REQUEST"),
+            ("enter otp to continue", "OTP_OR_PIN_REQUEST"),
+            ("kyc update nahi kiya toh account block", "ACCOUNT_SUSPENSION_THREAT"),
+        ]
+        for phrase, expected_category in test_phrases:
+            res, _ = self.manager.rules_engine.evaluate(phrase)
+            categories = [i.category for i in res.triggered_indicators]
+            self.assertIn(
+                expected_category,
+                categories,
+                f"Spoken phrase '{phrase}' should flag '{expected_category}', got {categories}",
+            )
+
+    # -------------------------------------------------------------------------
+    # 25. TELEGRAM VOIP LIVE CALL BRIDGE & SPIKE SIMULATION
+    # -------------------------------------------------------------------------
+    def test_25_live_bridge_status_and_spike_simulation(self) -> None:
+        """Verifies Telegram live call ingest status and spike simulation."""
+        status_resp = self.client.get("/internal/live/status")
+        self.assertEqual(status_resp.status_code, 200)
+        status_data = status_resp.json()
+        self.assertEqual(status_data["status"], "ready")
+        self.assertEqual(status_data["format"], "PCM16LE_MONO")
+
+        # Run spike simulation with an incoming scammer utterance
+        spike_resp = self.client.post(
+            "/internal/live/spike",
+            json={
+                "transcript": "Your electricity connection will be disconnected today. Share your OTP now.",
+                "customer_name": "Fake Electricity Officer",
+            },
+        )
+        self.assertEqual(spike_resp.status_code, 200)
+        spike_data = spike_resp.json()
+        self.assertEqual(spike_data["status"], "simulated")
+        self.assertIn("OTP_OR_PIN_REQUEST", [
+            i["category"] for i in spike_data["assessment"]["rule_analysis"]["triggered_indicators"]
+        ])
+        self.assertGreaterEqual(spike_data["assessment"]["risk_score"], 60.0)
+
 
 if __name__ == "__main__":
     unittest.main()
