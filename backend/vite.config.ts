@@ -22,6 +22,7 @@ export default defineConfig(() => {
         '/health': 'http://127.0.0.1:8000',
         '/transcribe': 'http://127.0.0.1:8000',
         '/analyze': 'http://127.0.0.1:8000',
+        '/rag': 'http://127.0.0.1:8000',
         '/calls': 'http://127.0.0.1:8000',
         '/sync': 'http://127.0.0.1:8000',
         '/telegram': 'http://127.0.0.1:8000',
