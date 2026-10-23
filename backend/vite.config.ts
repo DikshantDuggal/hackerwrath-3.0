@@ -22,12 +22,24 @@ export default defineConfig(() => {
         '/health': 'http://127.0.0.1:8000',
         '/transcribe': 'http://127.0.0.1:8000',
         '/analyze': 'http://127.0.0.1:8000',
+        '/rag': 'http://127.0.0.1:8000',
         '/calls': 'http://127.0.0.1:8000',
         '/sync': 'http://127.0.0.1:8000',
         '/telegram': 'http://127.0.0.1:8000',
         '/internal': {
           target: 'http://127.0.0.1:8000',
           ws: true,
+          configure: (proxy) => {
+            proxy.on('error', (err: any) => {
+              if (
+                err?.code === 'ECONNRESET' ||
+                err?.code === 'ECONNABORTED' ||
+                err?.code === 'EPIPE'
+              ) {
+                return; // suppress normal browser disconnect / refresh socket resets
+              }
+            });
+          },
         },
       },
     },

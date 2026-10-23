@@ -50,14 +50,16 @@ INBOUND_AUTH_NOTIFICATION_RE = re.compile(
 )
 
 ACTIVE_SOLICITATION_RE = re.compile(
-    r"\b(?:tell|share|send|give|batao|bhejiye|provide)\b.*"
+    r"\b(?:tell|share|send|give|batao|bhejiye|provide|asking(?:\s+for)?)\b.*"
     r"\b(?:me|us|hume|mujhe)?\b.*"
-    r"\b(?:otp|pin|cvv|code|password)\b"
+    r"\b(?:otp|pin|cvv|code|password|sensitive\s+info(?:rmation)?|sensitive\s+details|bank\s+details|account\s+details|card\s+details|credentials)\b"
     r"|"
     r"\b(?:verify|authenticate|unblock|confirm)\s+(?:your\s+)?(?:account|card|kyc|identity)\b.*"
-    r"\b(?:otp|pin|code)\b"
+    r"\b(?:otp|pin|code|details|credentials)\b"
     r"|"
-    r"(?:ओटीपी.*(?:बताएं|दीजिए|साझा|भेजें|सत्यापित)|सत्यापित.*ओटीपी|अपना\s+ओटीपी)",
+    r"\b(?:asking|demanding|soliciting)\s+(?:for\s+)?sensitive\s+info(?:rmation)?\b"
+    r"|"
+    r"(?:ओटीपी.*(?:बताएं|दीजिए|साझा|भेजें|सत्यापित)|सत्यापित.*ओटीपी|अपना\s+ओटीपी|संवेदनशील\s+जानकारी|बैंक\s+विवरण)",
     re.IGNORECASE,
 )
 

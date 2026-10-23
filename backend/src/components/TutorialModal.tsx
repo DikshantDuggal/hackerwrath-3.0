@@ -1,134 +1,252 @@
-import { useState } from 'react';
-import { X, ChevronRight, Shield, Mic, Send, Eye, Zap, Globe } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Shield,
+  Mic,
+  Phone,
+  Database,
+  Sparkles,
+  Zap,
+  Globe,
+  CheckCircle2,
+} from 'lucide-react';
 
 interface TutorialModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onNavigateTab?: (tab: 'mic' | 'phone' | 'text' | 'intel') => void;
 }
 
-const steps = [
+const tutorialSteps = [
   {
-    title: 'Welcome to Suraksha',
-    icon: <Shield className="w-10 h-10 text-[var(--purple-bright)]" />,
-    description: 'Suraksha is your AI-powered scam call detection shield. It listens to phone calls in real-time and alerts you when it detects suspicious patterns like OTP requests, impersonation, or urgent payment demands.',
-    tip: 'Works with English, Hindi, and Punjabi — even mixed-language calls!',
+    step: 1,
+    title: 'Welcome to Suraksha 3.0',
+    subtitle: 'Autonomous AI Scam-Call Detection & Negation Guard',
+    icon: <Shield className="w-8 h-8 text-[#00F0FF]" />,
+    description:
+      'Suraksha protects you against sophisticated phone scams, fake authority coercion (Digital Arrest), and reverse-UPI payment traps in real time.',
+    highlight: 'Grounded by 2,841 real Indian fraud dialogues and Sarvam AI multilingual acoustic intelligence.',
+    actionLabel: 'Next: Live Mic Shield',
   },
   {
-    title: 'Live Voice Detection',
-    icon: <Mic className="w-10 h-10 text-[var(--green-accent)]" />,
-    description: 'Click the microphone button to start recording. Suraksha captures audio in 5-second chunks, transcribes it using Sarvam AI Saaras, and runs it through our detection pipeline — all in real-time.',
-    tip: 'Put your phone on speaker and let Suraksha listen to the call.',
+    step: 2,
+    title: 'Live Microphone Shield',
+    subtitle: 'Hands-Free Protection During Live Calls',
+    icon: <Mic className="w-8 h-8 text-[#00F0FF]" />,
+    description:
+      'Put your phone on speakerphone during any incoming call and tap the central microphone button. Suraksha streams 16kHz audio, transcribes live speech, and detects deceptive coercion every ~7-8 words.',
+    highlight: 'Works across mixed Hindi, Indian English, and Punjabi speech.',
+    actionLabel: 'Next: Call Simulator',
+    tab: 'mic' as const,
   },
   {
-    title: 'Text Analysis',
-    icon: <Send className="w-10 h-10 text-[var(--purple-candle)]" />,
-    description: 'Can\'t use the mic? No problem! Paste any suspicious transcript text into the input box and Suraksha will analyze it instantly for scam patterns.',
-    tip: 'Try pasting: "I am calling from RBI. An arrest warrant is issued against your Aadhaar."',
+    step: 3,
+    title: 'Interactive Call Simulator HUD',
+    subtitle: 'Experience Live Scam Interceptions',
+    icon: <Phone className="w-8 h-8 text-[#72D7E8]" />,
+    description:
+      'Practice against realistic threat scenarios including CBI Digital Arrest, Customs Drug Parcels, and Electricity Power Cut threats. Watch the simulated caller HUD alert you before you enter a UPI PIN.',
+    highlight: 'Includes both Nordic Editorial and Cyberpunk HUD interfaces.',
+    actionLabel: 'Next: Grounded RAG Citations',
+    tab: 'phone' as const,
   },
   {
-    title: 'Understanding Risk Levels',
-    icon: <Eye className="w-10 h-10 text-[var(--amber-warn)]" />,
-    description: 'Suraksha uses a dual-engine detection system: a Rule-Based Engine scans for 8 categories of scam patterns, while the Contextual AI Director analyzes the caller\'s actual intent.',
-    tip: 'GREEN = Safe · YELLOW = Be Cautious · RED = Likely Scam · GREY = Insufficient Data',
+    step: 4,
+    title: 'Grounded RAG Vector Citations',
+    subtitle: 'Evidence-Backed Scam Classification',
+    icon: <Database className="w-8 h-8 text-[#8B7CFF]" />,
+    description:
+      'Every speech segment is vectorized and matched against our 2,841-transcript database using cosine similarity. The Risk Meter surfaces the top-3 nearest scam precedents with similarity scores and rationale.',
+    highlight: 'No hallucinated risks — every warning is backed by semantic vector evidence.',
+    actionLabel: 'Next: Smart Negation',
+    tab: 'intel' as const,
   },
   {
-    title: 'Smart Protection',
-    icon: <Zap className="w-10 h-10 text-[var(--green-bright)]" />,
-    description: 'Suraksha is smart enough to distinguish between actual scam requests ("Share your OTP") and protective advice ("Never share your OTP"). It won\'t raise false alarms on safety tips.',
-    tip: 'The system even detects prompt injection attempts trying to bypass detection!',
+    step: 5,
+    title: 'Smart Negation & Zero False Alarms',
+    subtitle: 'Distinguishes Protection from Fraud',
+    icon: <Zap className="w-8 h-8 text-[#63D6A5]" />,
+    description:
+      'Suraksha understands contextual intent. It distinguishes between a fraudster demanding "Share your OTP" and an official advisory saying "Never share your OTP", suppressing false alarms on genuine safety tips.',
+    highlight: 'Contextual AI Director checks caller claims, pressure tactics, and intent.',
+    actionLabel: 'Next: Threat Intel & Text AI',
+    tab: 'text' as const,
   },
   {
-    title: 'Multilingual Support',
-    icon: <Globe className="w-10 h-10 text-[var(--purple-bright)]" />,
-    description: 'Suraksha understands English, Hindi (Devanagari + Romanized), Punjabi (Gurmukhi + Romanized), and code-mixed speech. Perfect for real-world Indian phone calls.',
-    tip: 'Try: "भाई QR भेज रहा हूँ, scan करो payment आ जाएगा" — Suraksha will catch this!',
+    step: 6,
+    title: 'Threat Intel & Text Analyzer',
+    subtitle: 'Explore Signatures & Test Messages',
+    icon: <Sparkles className="w-8 h-8 text-[#F2C879]" />,
+    description:
+      'Paste suspicious SMS messages, explore synchronized fraud signatures across calls, or test the RAG vector store directly with your own phrases.',
+    highlight: 'Ready to experience Suraksha 3.0? Click "Get Started" to launch your shield.',
+    actionLabel: 'Get Started',
   },
 ];
 
-export default function TutorialModal({ isOpen, onClose }: TutorialModalProps) {
+export default function TutorialModal({ isOpen, onClose, onNavigateTab }: TutorialModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowRight') {
+        setCurrentStep((prev) => Math.min(tutorialSteps.length - 1, prev + 1));
+      } else if (e.key === 'ArrowLeft') {
+        setCurrentStep((prev) => Math.max(0, prev - 1));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const step = steps[currentStep];
-  const isLast = currentStep === steps.length - 1;
+  const current = tutorialSteps[currentStep];
+  const isFirst = currentStep === 0;
+  const isLast = currentStep === tutorialSteps.length - 1;
+
+  const handleNext = () => {
+    if (isLast) {
+      onClose();
+      setCurrentStep(0);
+    } else {
+      const nextIdx = currentStep + 1;
+      setCurrentStep(nextIdx);
+      if (onNavigateTab && tutorialSteps[nextIdx].tab) {
+        onNavigateTab(tutorialSteps[nextIdx].tab);
+      }
+    }
+  };
+
+  const handlePrev = () => {
+    const prevIdx = Math.max(0, currentStep - 1);
+    setCurrentStep(prevIdx);
+    if (onNavigateTab && tutorialSteps[prevIdx].tab) {
+      onNavigateTab(tutorialSteps[prevIdx].tab);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="glass-card relative max-w-lg w-full p-8 animate-slide-up" style={{ borderColor: 'rgba(139, 92, 246, 0.3)' }}>
-        {/* Close */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/5 transition-colors"
-        >
-          <X className="w-5 h-5 text-[var(--text-muted)]" />
-        </button>
+      {/* Modal Dialog (Responsive & Centered) */}
+      <div className="relative glass-card max-w-lg w-full p-6 sm:p-8 border border-[#1E2536] rounded-3xl animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
+        {/* Top Header Bar */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#00F0FF] bg-[#00F0FF]/10 px-2.5 py-1 rounded-full border border-[#00F0FF]/20">
+              Interactive Guide · Step {currentStep + 1} of {tutorialSteps.length}
+            </span>
+          </div>
 
-        {/* Step indicator */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="text-xs text-[#70798C] hover:text-white transition-colors cursor-pointer px-2 py-1"
+            >
+              Skip
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-full hover:bg-white/10 text-[#70798C] hover:text-white transition-colors cursor-pointer"
+              aria-label="Close Guide"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Step Progress Line */}
         <div className="flex gap-1.5 mb-6">
-          {steps.map((_, i) => (
-            <div
+          {tutorialSteps.map((_, i) => (
+            <button
               key={i}
-              className="h-1 rounded-full flex-1 transition-all duration-300"
-              style={{
-                background: i <= currentStep
-                  ? 'linear-gradient(90deg, var(--purple-glow), var(--green-accent))'
-                  : 'rgba(255,255,255,0.05)',
+              onClick={() => {
+                setCurrentStep(i);
+                if (onNavigateTab && tutorialSteps[i].tab) {
+                  onNavigateTab(tutorialSteps[i].tab);
+                }
               }}
+              className="h-1.5 rounded-full flex-1 transition-all cursor-pointer"
+              style={{
+                background:
+                  i === currentStep
+                    ? '#00F0FF'
+                    : i < currentStep
+                    ? 'rgba(0, 240, 255, 0.4)'
+                    : 'rgba(255, 255, 255, 0.1)',
+                boxShadow: i === currentStep ? '0 0 10px rgba(0,240,255,0.6)' : 'none',
+              }}
+              title={`Go to step ${i + 1}`}
             />
           ))}
         </div>
 
-        {/* Content */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--purple-dim)]/20 mb-4">
-            {step.icon}
+        {/* Center Icon & Content */}
+        <div className="text-center space-y-4 mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#00F0FF]/10 border border-[#00F0FF]/30 box-glow-cyan">
+            {current.icon}
           </div>
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-3">{step.title}</h2>
-          <p className="text-[var(--text-secondary)] leading-relaxed">{step.description}</p>
-        </div>
 
-        {/* Tip */}
-        <div className="glass p-4 mb-6 border-[var(--green-accent)]/20">
-          <p className="text-sm text-[var(--green-accent)]">
-            <span className="font-semibold">💡 Tip: </span>{step.tip}
+          <div>
+            <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+              {current.title}
+            </h3>
+            <p className="text-xs text-[#00F0FF] font-mono mt-1 font-medium">
+              {current.subtitle}
+            </p>
+          </div>
+
+          <p className="text-sm text-[#A2A9BA] leading-relaxed">
+            {current.description}
           </p>
+
+          <div className="p-3.5 rounded-2xl bg-[#090D16] border border-[#1E2536] text-left flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-[#00F0FF] shrink-0 mt-0.5" />
+            <p className="text-xs text-[#E8ECF2] leading-relaxed font-medium">
+              {current.highlight}
+            </p>
+          </div>
         </div>
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between">
+        {/* Navigation Buttons */}
+        <div className="flex items-center justify-between pt-4 border-t border-[#1E2536]">
           <button
-            onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
-            className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30"
-            disabled={currentStep === 0}
+            onClick={handlePrev}
+            disabled={isFirst}
+            className={`px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              isFirst
+                ? 'opacity-30 cursor-not-allowed text-[#70798C]'
+                : 'text-[#A2A9BA] hover:text-white hover:bg-white/5 border border-[#1E2536]'
+            }`}
           >
-            ← Back
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Back</span>
           </button>
 
-          <span className="text-xs text-[var(--text-muted)]">
-            {currentStep + 1} / {steps.length}
+          <span className="text-[11px] font-mono text-[#70798C] hidden sm:inline">
+            Press Esc to close · Arrow keys to navigate
           </span>
 
           <button
-            onClick={() => {
-              if (isLast) {
-                onClose();
-                setCurrentStep(0);
-              } else {
-                setCurrentStep(currentStep + 1);
-              }
-            }}
-            className="btn-primary flex items-center gap-2 text-sm py-2 px-5"
+            onClick={handleNext}
+            className="btn-cyan px-5 py-2 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-lg"
           >
-            {isLast ? 'Get Started' : 'Next'}
-            {!isLast && <ChevronRight className="w-4 h-4" />}
+            <span>{current.actionLabel}</span>
+            {!isLast && <ChevronRight className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>

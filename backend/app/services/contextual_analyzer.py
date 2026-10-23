@@ -311,8 +311,29 @@ class ContextualAnalyzer:
                         "enter your pin",
                         "tell me your cvv",
                         "share your password",
+                        "sensitive info",
+                        "sensitive information",
+                        "sensitive details",
+                        "sensitive data",
+                        "bank details",
+                        "banking details",
+                        "account details",
+                        "card details",
+                        "card number",
+                        "account number",
+                        "credentials",
+                        "login credentials",
+                        "asking sensitive info",
+                        "asking for sensitive info",
+                        "give me your sensitive",
+                        "share your sensitive",
+                        "tell me your sensitive",
+                        "provide your sensitive",
                         "ओटीपी बताओ",
                         "पिन डालो",
+                        "संवेदनशील जानकारी",
+                        "बैंक विवरण",
+                        "खाता विवरण",
                         "ਓਟੀਪੀ ਦੱਸੋ",
                         "ਪਿੰਨ ਪਾਓ",
                     )
@@ -322,8 +343,8 @@ class ContextualAnalyzer:
         )
 
         if asks_for_otp_or_pin:
-            requested_actions.append("Disclose OTP, UPI PIN, or banking credential")
-            money_or_sensitive.append("Direct request for OTP / UPI PIN / secret verification code")
+            requested_actions.append("Disclose sensitive banking credentials, confidential details, or OTP")
+            money_or_sensitive.append("Direct request for sensitive banking credentials, confidential details, or verification code")
             excerpts.append(current_text[:180])
 
         asks_to_scan_qr_for_payout = (
@@ -504,9 +525,9 @@ class ContextualAnalyzer:
         # Neutral baseline is 0.0 (never arbitrary non-zero defaults for harmless text)
         risk = 0.0
         if asks_for_otp_or_pin:
-            risk += 58.0
+            risk += 64.0
         if asks_to_scan_qr_for_payout:
-            risk += 58.0
+            risk += 62.0
         if asks_for_remote_access:
             risk += 62.0
         if asks_for_suspicious_link:

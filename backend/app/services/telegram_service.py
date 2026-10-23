@@ -91,6 +91,8 @@ class TelegramAlertService:
         threshold = self.settings.telegram_alert_threshold.upper()
         if threshold == "CRITICAL":
             return risk_level == "CRITICAL" or risk_score >= 80.0
+        if threshold == "MEDIUM":
+            return risk_level in ("MEDIUM", "HIGH", "CRITICAL") or risk_score >= 30.0
 
         # Default threshold is HIGH (alerts for both HIGH and CRITICAL, or risk_score >= 60.0)
         return risk_level in ("HIGH", "CRITICAL") or risk_score >= 60.0

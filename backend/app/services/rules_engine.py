@@ -97,9 +97,10 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
 
 
 REGEX_OTP_SOLICITATION = re.compile(
-    r"\b(what is|whats|batao|bata|dasso|das|share|tell|give|enter|send|provide|input|type|confirm|verify|daalo|daal|bhejo|bhej|likho|bolo|read out|boliye|bataiye|need)\b.*?\b(otp|pin|upi pin|password|passcode|cvv|code|verification code)\b"
-    r"|\b(otp|pin|upi pin|password|passcode|cvv|code|verification code)\b.*?\b(batao|bata|dasso|das|share|tell|give|enter|send|provide|daalo|daal|bhejo|bhej|likho|bolo|chahiye|de do|bata do|dass do|verify|confirm|karo|bataiye)\b"
-    r"|(?:ओटीपी|पिन|पासवर्ड|सीवीवी).*(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर)|(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर).*(?:ओटीपी|पिन|पासवर्ड|सीवीवी)"
+    r"\b(what is|whats|batao|bata|dasso|das|share|tell|give|enter|send|provide|input|type|confirm|verify|daalo|daal|bhejo|bhej|likho|bolo|read out|boliye|bataiye|need|asking|asking for)\b.*?\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials|login credentials|confidential info|confidential details)\b"
+    r"|\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials)\b.*?\b(batao|bata|dasso|das|share|tell|give|enter|send|provide|daalo|daal|bhejo|bhej|likho|bolo|chahiye|de do|bata do|dass do|verify|confirm|karo|bataiye|needed|required)\b"
+    r"|\b(?:asking|demanding|requesting|soliciting)\s+(?:for\s+)?sensitive\s+(?:info|information|details|data|credentials)\b"
+    r"|(?:ओटीपी|पिन|पासवर्ड|सीवीवी|संवेदनशील\s+जानकारी|बैंक\s+विवरण).*(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर)|(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर).*(?:ओटीपी|पिन|पासवर्ड|सीवीवी|संवेदनशील\s+जानकारी|बैंक\s+विवरण)"
     r"|(?:ਓਟੀਪੀ|ਪਿੰਨ).*(?:ਦੱਸੋ|ਦੱਸ|ਪਾਓ|ਭੇਜੋ)|(?:ਦੱਸੋ|ਦੱਸ|ਪਾਓ|ਭੇਜੋ).*(?:ਓਟੀਪੀ|ਪਿੰਨ)",
     re.IGNORECASE,
 )
@@ -181,6 +182,26 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
             "otp dasso",
             "mainu dasso",
             "tuhade phone te otp aaya",
+            "asking sensitive info",
+            "asking for sensitive info",
+            "asking for sensitive information",
+            "asking sensitive information",
+            "share your sensitive info",
+            "share sensitive info",
+            "give me your sensitive info",
+            "tell me your sensitive info",
+            "provide your sensitive info",
+            "give me sensitive info",
+            "share sensitive information",
+            "give me your bank details",
+            "share your bank details",
+            "give me your account details",
+            "share your account details",
+            "give me your card details",
+            "share your card details",
+            "tell me your card number",
+            "share your credentials",
+            "give me your credentials",
             "ओटीपी बताओ",
             "ओटीपी बता दीजिए",
             "यूपीआई पिन डालो",
@@ -188,7 +209,7 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
             "ਓਟੀਪੀ ਦੱਸੋ",
             "ਪਿੰਨ ਪਾਓ",
         ),
-        explanation="Caller explicitly requested an OTP, verification code, UPI PIN, CVV, or password.",
+        explanation="Caller explicitly requested an OTP, verification code, UPI PIN, CVV, password, sensitive information, or banking credentials.",
     ),
     RulePatternDef(
         rule_id="RULE_QR_SCAN_RECEIVE_LURE",
