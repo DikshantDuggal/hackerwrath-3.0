@@ -29,6 +29,17 @@ export default defineConfig(() => {
         '/internal': {
           target: 'http://127.0.0.1:8000',
           ws: true,
+          configure: (proxy) => {
+            proxy.on('error', (err: any) => {
+              if (
+                err?.code === 'ECONNRESET' ||
+                err?.code === 'ECONNABORTED' ||
+                err?.code === 'EPIPE'
+              ) {
+                return; // suppress normal browser disconnect / refresh socket resets
+              }
+            });
+          },
         },
       },
     },

@@ -24,8 +24,9 @@
   /* Accents */
   --accent-violet: #8B7CFF;
   --accent-violet-glow: rgba(139, 124, 255, 0.22);
-  --accent-cyan: #72D7E8;
-  --accent-cyan-glow: rgba(114, 215, 232, 0.22);
+  --accent-cyan: #00F0FF;
+  --accent-cyan-glow: rgba(0, 240, 255, 0.35);
+  --accent-teal: #72D7E8;
 
   /* Semantic State Tokens */
   --color-success: #63D6A5;
@@ -214,4 +215,57 @@ body {
 
 .animate-glow {
   animation: pulseGlow 2.5s ease-in-out infinite;
+}
+
+/* ─── Reference Image Glow & Cyan Utilities ─── */
+.text-glow-cyan {
+  text-shadow: 0 0 16px rgba(0, 240, 255, 0.7), 0 0 35px rgba(0, 240, 255, 0.4);
+}
+
+.text-glow-cyan-lg {
+  text-shadow: 0 0 25px rgba(0, 240, 255, 0.85), 0 0 50px rgba(0, 240, 255, 0.5), 0 0 90px rgba(0, 240, 255, 0.25);
+}
+
+.box-glow-cyan {
+  box-shadow: 0 0 25px -4px rgba(0, 240, 255, 0.45), inset 0 0 15px rgba(0, 240, 255, 0.1);
+}
+
+.box-glow-cyan-card {
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.7), 0 0 20px -5px rgba(0, 240, 255, 0.15);
+}
+
+.box-glow-cyan-card:hover {
+  box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.8), 0 0 30px -2px rgba(0, 240, 255, 0.35);
+  transform: translateY(-2px);
+  border-color: rgba(0, 240, 255, 0.5);
+}
+
+.btn-cyan {
+  background: linear-gradient(135deg, #00F0FF 0%, #00B4D8 100%);
+  color: #040810;
+  font-weight: 700;
+  border-radius: 9999px;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.45);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-cyan:hover:not(:disabled) {
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.75);
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #38E1FF 0%, #00C2FF 100%);
+}
+
+.btn-outline-cyan {
+  background: rgba(0, 240, 255, 0.05);
+  color: #00F0FF;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+}
+
+.btn-outline-cyan:hover:not(:disabled) {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: #00F0FF;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.35);
+  color: #FFFFFF;
 }

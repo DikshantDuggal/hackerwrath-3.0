@@ -98,11 +98,11 @@ export default function AstraOrbitalCanvas({
         default:
           return {
             sunCore: '#FFFFFF',
-            sunInner: '#8B7CFF',
-            sunOuter: 'rgba(114, 215, 232, 0.3)',
-            sunGlow: 'rgba(139, 124, 255, 0.14)',
-            orbitStroke: 'rgba(139, 124, 255, 0.12)',
-            accent: '#8B7CFF',
+            sunInner: '#00F0FF',
+            sunOuter: 'rgba(0, 240, 255, 0.45)',
+            sunGlow: 'rgba(0, 240, 255, 0.2)',
+            orbitStroke: 'rgba(0, 240, 255, 0.15)',
+            accent: '#00F0FF',
           };
       }
     };
@@ -139,7 +139,7 @@ export default function AstraOrbitalCanvas({
         glowColor: 'rgba(162, 169, 186, 0.4)',
         trail: [],
       },
-      // 2. Cyan Terrestrial World with Moon
+      // 2. Electric Cyan Terrestrial World with Moon
       {
         orbitA: 210,
         orbitB: 80,
@@ -147,8 +147,8 @@ export default function AstraOrbitalCanvas({
         angle: 2.4,
         speed: 0.009,
         radius: 6,
-        color: '#72D7E8',
-        glowColor: 'rgba(114, 215, 232, 0.5)',
+        color: '#00F0FF',
+        glowColor: 'rgba(0, 240, 255, 0.7)',
         hasMoon: true,
         moonAngle: 0,
         moonDist: 14,

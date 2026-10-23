@@ -26,6 +26,7 @@ import type { RiskAssessment } from '../hooks/useLiveDetection';
 interface PhoneCallMockupProps {
   onAnalyzeSegment: (text: string) => Promise<RiskAssessment | null>;
   activeRisk: RiskAssessment | null;
+  selectedScenarioId?: string;
 }
 
 type Language = 'en' | 'hi' | 'pa';
@@ -110,11 +111,26 @@ const STRINGS = {
   },
 };
 
-export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk }: PhoneCallMockupProps) {
+export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, selectedScenarioId }: PhoneCallMockupProps) {
   const [theme, setTheme] = useState<ViewTheme>('nordic');
   const [language, setLanguage] = useState<Language>('en');
   const [expectingPayment, setExpectingPayment] = useState(false);
-  const [selectedScenario, setSelectedScenario] = useState<DemoScenario>(DEMO_SCENARIOS[0]);
+  const [selectedScenario, setSelectedScenario] = useState<DemoScenario>(() => {
+    if (selectedScenarioId) {
+      const match = DEMO_SCENARIOS.find((s) => s.id === selectedScenarioId);
+      if (match) return match;
+    }
+    return DEMO_SCENARIOS[0];
+  });
+
+  useEffect(() => {
+    if (selectedScenarioId) {
+      const match = DEMO_SCENARIOS.find((s) => s.id === selectedScenarioId);
+      if (match) {
+        setSelectedScenario(match);
+      }
+    }
+  }, [selectedScenarioId]);
   const [callState, setCallState] = useState<InternalCallState>('IDLE');
   const [currentSegmentIdx, setCurrentSegmentIdx] = useState(0);
   const [callDuration, setCallDuration] = useState(0);

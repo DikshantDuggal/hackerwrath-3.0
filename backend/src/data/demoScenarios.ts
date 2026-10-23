@@ -138,4 +138,22 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     ],
     explanation: 'Legitimate Context: Buyer asks for the seller\'s QR to pay the seller. Suraksha detects legitimate intent.',
   },
+  {
+    id: 'telegram-task-parttime',
+    title: 'Telegram Part-Time Like/Review Task Scam',
+    language: 'Hindi (हिंदी)',
+    badge: '🚨 Advance Fee Trap',
+    expectedRisk: 'HIGH',
+    category: 'TASK_INVESTMENT_SCAM',
+    callerName: 'Priya Sharma (HR Recruitment)',
+    callerNumber: '+91 91234 56789',
+    transcript: 'नमस्ते, मैं ग्लोबल रेटिंग्स कंपनी से बोल रही हूँ। आपका नंबर नौकरी पोर्टल से मिला। आपको बस यूट्यूब वीडियो लाइक और गूगल मैप्स रिव्यू करना है। हर रिव्यू के ₹150 मिलेंगे। अभी हमारे वीआईपी टेलीग्राम ग्रुप से जुड़ें और वीआईपी टास्क अनलॉक करने के लिए ₹2,000 रजिस्ट्रेशन फीस जमा करें।',
+    segments: [
+      { speaker: 'caller', text: 'नमस्ते, मैं ग्लोबल मीडिया रिक्रूटमेंट से बोल रही हूँ।', delayMs: 1200 },
+      { speaker: 'caller', text: 'घर बैठे पार्ट-टाइम काम करके आप रोज 3 से 5 हजार कमा सकते हैं।', delayMs: 1800 },
+      { speaker: 'caller', text: 'काम बहुत आसान है, सिर्फ होटल रिव्यू और यूट्यूब लाइक करना है।', delayMs: 1800 },
+      { speaker: 'caller', text: 'अकाउंट एक्टिवेट करने के लिए टेलीग्राम पर 2000 रुपये सिक्योरिटी डिपॉजिट भेजिए।', delayMs: 2200 },
+    ],
+    explanation: 'Part-Time Task Scam: Victim is lured with small initial payouts for trivial review tasks, then coerced into depositing thousands for non-existent "prepaid task profit".',
+  },
 ];
