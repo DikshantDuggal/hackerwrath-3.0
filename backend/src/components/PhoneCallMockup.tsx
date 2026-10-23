@@ -681,7 +681,7 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, selected
         {/* NORDIC EDITORIAL PHONE SHELL */}
         {/* ======================================================== */}
         {theme === 'nordic' ? (
-          <div className="relative w-full max-w-[390px] min-h-[640px] bg-[#FAFAF8] text-[#1F2937] rounded-[44px] overflow-hidden flex flex-col border-[10px] border-[#262a30] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] transition-all">
+          <div className="relative w-full max-w-[390px] min-h-[580px] sm:min-h-[640px] bg-[#FAFAF8] text-[#1F2937] rounded-[32px] sm:rounded-[44px] overflow-hidden flex flex-col border-4 sm:border-[10px] border-[#262a30] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] transition-all">
             {/* Status Bar */}
             <div className="h-9 px-6 pt-2.5 flex justify-between items-center text-[11px] font-semibold text-slate-700 bg-transparent z-40 select-none">
               <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
