@@ -1,0 +1,214 @@
+{
+  "dataset": {
+    "test_size": 100,
+    "scam_count": 100,
+    "legit_count": 0,
+    "english_test_count": 50,
+    "hindi_test_count": 50
+  },
+  "system_1_tfidf_baseline": {
+    "overall": {
+      "accuracy": 0.99,
+      "macro_f1": 0.4975,
+      "scam_metrics": {
+        "precision": 1.0,
+        "recall": 0.99,
+        "f1": 0.995
+      },
+      "legitimate_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "confusion_matrix": {
+        "true_negatives_legit": 0,
+        "false_positives_scam": 0,
+        "false_negatives_legit": 1,
+        "true_positives_scam": 99
+      },
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.01,
+      "avg_latency_ms": 0.258
+    },
+    "english_slice": {
+      "accuracy": 0.98,
+      "macro_f1": 0.4949,
+      "scam_metrics": {
+        "precision": 1.0,
+        "recall": 0.98,
+        "f1": 0.9899
+      },
+      "legitimate_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "confusion_matrix": {
+        "true_negatives_legit": 0,
+        "false_positives_scam": 0,
+        "false_negatives_legit": 1,
+        "true_positives_scam": 49
+      },
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.02
+    },
+    "hindi_slice": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "scam_metrics": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "legitimate_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "confusion_matrix": {
+        "true_negatives_legit": 0,
+        "false_positives_scam": 0,
+        "false_negatives_legit": 0,
+        "true_positives_scam": 50
+      },
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.0
+    }
+  },
+  "system_2_rag_classifier": {
+    "overall": {
+      "accuracy": 0.93,
+      "macro_f1": 0.4819,
+      "scam_metrics": {
+        "precision": 1.0,
+        "recall": 0.93,
+        "f1": 0.9637
+      },
+      "legitimate_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "confusion_matrix": {
+        "true_negatives_legit": 0,
+        "false_positives_scam": 0,
+        "false_negatives_legit": 7,
+        "true_positives_scam": 93
+      },
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.07,
+      "avg_inference_latency_ms": 152.47,
+      "avg_retrieval_latency_ms": 151.57
+    },
+    "english_slice": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "scam_metrics": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "legitimate_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "confusion_matrix": {
+        "true_negatives_legit": 0,
+        "false_positives_scam": 0,
+        "false_negatives_legit": 0,
+        "true_positives_scam": 50
+      },
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.0
+    },
+    "hindi_slice": {
+      "accuracy": 0.86,
+      "macro_f1": 0.4624,
+      "scam_metrics": {
+        "precision": 1.0,
+        "recall": 0.86,
+        "f1": 0.9247
+      },
+      "legitimate_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "confusion_matrix": {
+        "true_negatives_legit": 0,
+        "false_positives_scam": 0,
+        "false_negatives_legit": 7,
+        "true_positives_scam": 43
+      },
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.14
+    }
+  },
+  "targeted_probes": [
+    {
+      "probe_id": "Probe_Protective_EN",
+      "text": "Never share your OTP with anyone. Our bank representatives never ask for it.",
+      "expected": "LEGITIMATE",
+      "predicted": "LEGITIMATE",
+      "risk_score": 0.0,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_Protective_HI",
+      "text": "\u0915\u093f\u0938\u0940 \u0915\u0947 \u0938\u093e\u0925 \u092d\u0940 \u0905\u092a\u0928\u093e \u0913\u091f\u0940\u092a\u0940 \u0938\u093e\u091d\u093e \u0928 \u0915\u0930\u0947\u0902\u0964 \u092c\u0948\u0902\u0915 \u0905\u0927\u093f\u0915\u093e\u0930\u0940 \u0915\u092d\u0940 \u092d\u0940 \u092f\u0939 \u0928\u0939\u0940\u0902 \u092e\u093e\u0902\u0917\u0924\u0947\u0964",
+      "expected": "LEGITIMATE",
+      "predicted": "LEGITIMATE",
+      "risk_score": 0.0,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_Solicitation_EN",
+      "text": "Tell me the OTP you just received right now so I can verify your account.",
+      "expected": "SCAM",
+      "predicted": "SCAM",
+      "risk_score": 100.0,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_Solicitation_HI",
+      "text": "\u0938\u0924\u094d\u092f\u093e\u092a\u093f\u0924 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0905\u092a\u0928\u093e \u0913\u091f\u0940\u092a\u0940 \u0924\u0941\u0930\u0902\u0924 \u0938\u093e\u091d\u093e \u0915\u0930\u0947\u0902\u0964",
+      "expected": "SCAM",
+      "predicted": "SCAM",
+      "risk_score": 85.10563221809613,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_AuthNotice_EN",
+      "text": "Your OTP for login is 492018. Valid for 10 minutes. Do not share.",
+      "expected": "LEGITIMATE",
+      "predicted": "LEGITIMATE",
+      "risk_score": 0.0,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_AuthNotice_HI",
+      "text": "\u0932\u0949\u0917\u093f\u0928 \u0915\u0947 \u0932\u093f\u090f \u0906\u092a\u0915\u093e \u0913\u091f\u0940\u092a\u0940 492018 \u0939\u0948\u0964 10 \u092e\u093f\u0928\u091f \u0915\u0947 \u0932\u093f\u090f \u0935\u0948\u0927 \u0939\u0948\u0964",
+      "expected": "LEGITIMATE",
+      "predicted": "LEGITIMATE",
+      "risk_score": 5.0,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_UrgentFreeze_EN",
+      "text": "Your bank account has been blocked immediately. Transfer 5000 to unfreeze.",
+      "expected": "SCAM",
+      "predicted": "SCAM",
+      "risk_score": 100.0,
+      "passed": true
+    },
+    {
+      "probe_id": "Probe_UrgentFreeze_HI",
+      "text": "\u0906\u092a\u0915\u093e \u092c\u0948\u0902\u0915 \u0916\u093e\u0924\u093e \u0924\u0941\u0930\u0902\u0924 \u092c\u094d\u0932\u0949\u0915 \u0915\u0930 \u0926\u093f\u092f\u093e \u0917\u092f\u093e \u0939\u0948\u0964 \u0915\u093e\u0928\u0942\u0928\u0940 \u0915\u093e\u0930\u094d\u0930\u0935\u093e\u0908 \u0938\u0947 \u092c\u091a\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0924\u0941\u0930\u0902\u0924 \u092d\u0941\u0917\u0924\u093e\u0928 \u0915\u0930\u0947\u0902\u0964",
+      "expected": "SCAM",
+      "predicted": "SCAM",
+      "risk_score": 75.0,
+      "passed": true
+    }
+  ]
+}

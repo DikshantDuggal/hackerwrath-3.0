@@ -1,0 +1,59 @@
+{
+  "raw_dataset_statistics": {
+    "total_files_discovered": 18974,
+    "legit_files": 11978,
+    "scam_files": 6996,
+    "empty_files": 0
+  },
+  "deduplication_summary": {
+    "raw_record_count": 18974,
+    "canonical_record_count": 9482,
+    "duplicate_records_removed": 9492,
+    "cross_label_conflicts": 0,
+    "scam_canonical_count": 3493,
+    "legit_canonical_count": 5989
+  },
+  "word_count_distribution": {
+    "scam": {
+      "min": 78,
+      "max": 372,
+      "mean": 181.4
+    },
+    "legitimate": {
+      "min": 55,
+      "max": 325,
+      "mean": 159.8
+    },
+    "overall": {
+      "min": 55,
+      "max": 372,
+      "mean": 167.7
+    }
+  },
+  "stratified_partitions": {
+    "train": {
+      "total": 6637,
+      "scam": 2445,
+      "legitimate": 4192,
+      "ratio_scam_percent": 36.84
+    },
+    "validation": {
+      "total": 1421,
+      "scam": 523,
+      "legitimate": 898,
+      "ratio_scam_percent": 36.81
+    },
+    "test": {
+      "total": 1424,
+      "scam": 525,
+      "legitimate": 899,
+      "ratio_scam_percent": 36.87
+    }
+  },
+  "split_ratios": {
+    "train": 0.7,
+    "val": 0.15,
+    "test": 0.15
+  },
+  "random_seed": 42
+}
