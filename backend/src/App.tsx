@@ -1,33 +1,49 @@
-import { useState, useCallback } from 'react';
-import {
-  Shield,
-  Mic,
-  Phone,
-  Sparkles,
-  Database,
-  HelpCircle,
-  Key,
-  Volume2,
-  VolumeX,
-  Radio,
-  CheckCircle,
-  AlertTriangle,
-  Flame,
-} from 'lucide-react';
-import AstraOrbitalCanvas from './components/AstraOrbitalCanvas';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { HelpCircle, KeyRound, Volume2, VolumeX } from 'lucide-react';
 import RiskDisplay from './components/RiskDisplay';
 import TranscriptPanel from './components/TranscriptPanel';
 import TextInputPanel from './components/TextInputPanel';
 import TutorialModal from './components/TutorialModal';
 import KeysModal from './components/KeysModal';
 import PhoneCallMockup from './components/PhoneCallMockup';
-import LiveVoiceTester from './components/LiveVoiceTester';
+import LiveVoiceTester, { type LiveVoiceHandle } from './components/LiveVoiceTester';
 import ThreatIntelPanel from './components/ThreatIntelPanel';
 import StatusBar from './components/StatusBar';
+import Guardian from './components/Guardian';
+import GuardianHome from './components/GuardianHome';
+import ScamAlert from './components/ScamAlert';
 import { audioAlerts } from './utils/audioAlerts';
+import { useHistory, type CheckSource } from './spell/history';
+import { askKindOf, categoriesOf, chipsOf, isHigh, toneOf, type AskKind } from './spell/signals';
 import type { RiskAssessment, TranscriptSegment } from './hooks/useLiveDetection';
 
 type ActiveTab = 'mic' | 'phone' | 'text' | 'intel';
+type Edition = 'standard' | 'premium';
+
+const TABS: Array<{ id: ActiveTab; label: string }> = [
+  { id: 'mic', label: 'Home' },
+  { id: 'phone', label: 'Demo calls' },
+  { id: 'text', label: 'Text check' },
+  { id: 'intel', label: 'Threat intel' },
+];
+
+const SOURCE_FOR_TAB: Record<ActiveTab, CheckSource> = { mic: 'mic', phone: 'call', text: 'text', intel: 'text' };
+
+interface OpenAlert {
+  kind: AskKind;
+  chips: string[];
+  askedAt: number;
+  source: CheckSource;
+  warningId: string | null;
+}
+
+function loadEdition(): Edition {
+  try {
+    return localStorage.getItem('edgerunners_edition') === 'premium' ? 'premium' : 'standard';
+  } catch {
+    return 'standard';
+  }
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('mic');
@@ -35,11 +51,81 @@ export default function App() {
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [isAudioMuted, setIsAudioMuted] = useState<boolean>(false);
   const [showTutorial, setShowTutorial] = useState(() => {
-    return !localStorage.getItem('suraksha_tutorial_seen');
+    try {
+      return !localStorage.getItem('suraksha_tutorial_seen');
+    } catch {
+      return false;
+    }
   });
   const [showKeysModal, setShowKeysModal] = useState(false);
   const [transcriptHistory, setTranscriptHistory] = useState<TranscriptSegment[]>([]);
   const [isProcessingText, setIsProcessingText] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [edition, setEdition] = useState<Edition>(loadEdition);
+
+  const history = useHistory();
+  const [alert, setAlert] = useState<OpenAlert | null>(null);
+  const [alertRun, setAlertRun] = useState(0);
+  const alertRef = useRef<OpenAlert | null>(null);
+  alertRef.current = alert;
+  const quietRef = useRef<{ kind: AskKind; until: number } | null>(null);
+
+  const voiceRef = useRef<LiveVoiceHandle>(null);
+  const hangUpRef = useRef<(() => void) | null>(null);
+  const tabRef = useRef(activeTab);
+  tabRef.current = activeTab;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (edition === 'premium') root.dataset.edition = 'premium';
+    else delete root.dataset.edition;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', edition === 'premium' ? '#0E1014' : '#F4F1EA');
+    try {
+      localStorage.setItem('edgerunners_edition', edition);
+    } catch {
+      // Storage blocked: the edition just won't be remembered.
+    }
+  }, [edition]);
+
+  /** Every assessment goes through here: it updates the guardian and raises the alert on a high-risk ask. */
+  const handleAssessment = useCallback(
+    (assessment: RiskAssessment | null, source: CheckSource = SOURCE_FOR_TAB[tabRef.current]) => {
+      setActiveRisk(assessment);
+      if (!assessment || !isHigh(assessment.risk_level) || alertRef.current) return;
+      const kind = askKindOf(categoriesOf(assessment));
+      const quiet = quietRef.current;
+      if (quiet && quiet.kind === kind && Date.now() < quiet.until) return;
+      const next: OpenAlert = {
+        kind,
+        chips: chipsOf(assessment),
+        askedAt: Date.now(),
+        source,
+        // Pasted words aren't a call, so they don't count towards the week.
+        warningId: source === 'text' ? null : history.openWarning(source, kind),
+      };
+      alertRef.current = next;
+      setAlert(next);
+      setAlertRun((n) => n + 1);
+    },
+    [history.openWarning]
+  );
+
+  const closeAlert = (outcome: 'hung_up' | 'kept') => {
+    const current = alertRef.current;
+    if (!current) return;
+    if (current.warningId) history.resolveWarning(current.warningId, outcome);
+    if (outcome === 'kept') quietRef.current = { kind: current.kind, until: Date.now() + 30_000 };
+    // Hung up: that call is over, so the guardian goes back to listening.
+    if (outcome === 'hung_up') setActiveRisk(null);
+    alertRef.current = null;
+    setAlert(null);
+  };
+
+  const reopenAlert = () => {
+    if (!activeRisk) return;
+    quietRef.current = null;
+    handleAssessment(activeRisk);
+  };
 
   const handleToggleSound = () => {
     const muted = audioAlerts.toggleMute();
@@ -48,8 +134,28 @@ export default function App() {
 
   const handleCloseTutorial = useCallback(() => {
     setShowTutorial(false);
-    localStorage.setItem('suraksha_tutorial_seen', 'true');
+    try {
+      localStorage.setItem('suraksha_tutorial_seen', 'true');
+    } catch {
+      // Ignore: the tour shows again next visit.
+    }
   }, []);
+
+  const handleRecordingChange = useCallback(
+    (recording: boolean) => {
+      setListening(recording);
+      if (recording) history.addCheck('mic');
+    },
+    [history.addCheck]
+  );
+
+  const toggleListening = () => {
+    if (listening) voiceRef.current?.stop();
+    else {
+      setActiveRisk(null);
+      voiceRef.current?.start();
+    }
+  };
 
   // Text analysis handler
   const handleAnalyzeText = async (text: string): Promise<void> => {
@@ -77,7 +183,8 @@ export default function App() {
 
       if (res.ok) {
         const assessment: RiskAssessment = await res.json();
-        setActiveRisk(assessment);
+        history.addCheck('text');
+        handleAssessment(assessment, 'text');
 
         if (assessment.risk_level === 'HIGH' || assessment.risk_level === 'CRITICAL') {
           audioAlerts.playHighRiskAlert();
@@ -109,7 +216,7 @@ export default function App() {
 
       if (res.ok) {
         const assessment: RiskAssessment = await res.json();
-        setActiveRisk(assessment);
+        handleAssessment(assessment, 'call');
         setTranscriptHistory((prev) => [
           ...prev,
           {
@@ -127,257 +234,203 @@ export default function App() {
     return null;
   };
 
-  const riskLevel = activeRisk?.risk_level || 'LOW';
+  const registerHangUp = useCallback((fn: (() => void) | null) => {
+    hangUpRef.current = fn;
+  }, []);
+
+  const tone = toneOf(activeRisk?.risk_level, listening);
+
+  const alertActions = (a: OpenAlert) => {
+    if (a.source === 'mic') {
+      return {
+        primary: {
+          label: 'I hung up',
+          onClick: () => {
+            closeAlert('hung_up');
+            voiceRef.current?.stop();
+          },
+        },
+        secondary: { label: 'Keep listening', onClick: () => closeAlert('kept') },
+      };
+    }
+    if (a.source === 'call') {
+      return {
+        primary: {
+          label: 'End call',
+          onClick: () => {
+            closeAlert('hung_up');
+            hangUpRef.current?.();
+          },
+        },
+        secondary: { label: 'Keep talking', onClick: () => closeAlert('kept') },
+      };
+    }
+    return {
+      primary: { label: 'Got it', onClick: () => closeAlert('kept') },
+      secondary: { label: 'Check other words', onClick: () => closeAlert('kept') },
+    };
+  };
 
   return (
-    <div className="min-h-screen relative flex flex-col font-sans selection:bg-purple-500/30 selection:text-white">
-      {/* 3D Astra Orbital Canvas with Candlelight Obsidian + Green Shade */}
-      <AstraOrbitalCanvas
-        riskLevel={riskLevel}
-        isListening={activeTab === 'mic'}
-        audioLevel={audioLevel}
-      />
+    <div className="min-h-screen flex flex-col">
+      <header className="sticky top-0 z-30 border-b border-line backdrop-blur-md" style={{ background: 'var(--sb-nav)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab('mic')}
+            className="flex items-center gap-2.5 bg-transparent border-0 p-0 text-left"
+            aria-label="Edgerunners, home"
+          >
+            <Guardian tone={tone} size={40} />
+            <span className="sb-display text-[26px] leading-none">Edgerunners</span>
+            {edition === 'premium' && (
+              <span className="text-[10px] font-bold tracking-[0.18em] px-2 py-0.5 rounded-full bg-accent text-on-accent">PREMIUM</span>
+            )}
+          </button>
 
-      {/* Atmospheric gradient mesh */}
-      <div className="bg-mesh pointer-events-none" />
+          <nav
+            aria-label="Sections"
+            className="order-last md:order-none w-full md:w-auto flex items-center gap-1 p-1 rounded-full bg-surface overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                aria-current={activeTab === tab.id ? 'page' : undefined}
+                onClick={() => {
+                  audioAlerts.playClick();
+                  setActiveTab(tab.id);
+                }}
+                className={`flex-1 md:flex-none whitespace-nowrap px-4 min-h-10 rounded-full text-[14px] font-bold transition-colors ${
+                  activeTab === tab.id ? 'bg-accent text-on-accent' : 'text-muted hover:text-ink'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
 
-      {/* Content Layer */}
-      <div className="relative z-20 flex flex-col min-h-screen">
-        {/* Navigation Bar */}
-        <header className="glass border-b border-[var(--glass-border)] px-4 sm:px-6 py-3.5 sticky top-0 z-30 shadow-md">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="relative group cursor-pointer" onClick={() => setShowTutorial(true)}>
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[var(--purple-dim)] via-[var(--purple-glow)] to-[var(--green-accent)] p-[1.5px] shadow-[0_0_20px_rgba(168,85,247,0.4)]">
-                  <div className="w-full h-full rounded-[14px] bg-[#0c051a] flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-[var(--purple-bright)]" />
-                  </div>
-                </div>
-                <div className="absolute -inset-1 rounded-2xl bg-[var(--green-accent)] opacity-20 blur-sm group-hover:opacity-40 transition-opacity" />
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-black tracking-wider gradient-text font-mono">
-                    SURAKSHA
-                  </h1>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--green-accent)]/15 text-[var(--green-bright)] border border-[var(--green-accent)]/30 font-semibold">
-                    MVP 1.0
-                  </span>
-                </div>
-                <p className="text-[10px] text-[var(--text-muted)] tracking-widest uppercase">
-                  AI Scam-Call Detection & Negation Guard
-                </p>
-              </div>
+          <div className="flex items-center gap-1.5">
+            <div role="radiogroup" aria-label="Edition" className="hidden sm:flex items-center p-1 rounded-full bg-surface">
+              {(['standard', 'premium'] as const).map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  role="radio"
+                  aria-checked={edition === e}
+                  onClick={() => setEdition(e)}
+                  className={`px-3 min-h-8 rounded-full text-[12px] font-bold capitalize transition-colors ${
+                    edition === e ? 'bg-card text-head shadow-sm' : 'text-faint hover:text-ink'
+                  }`}
+                >
+                  {e}
+                </button>
+              ))}
             </div>
-
-            {/* Navigation Tabs */}
-            <nav className="flex items-center gap-1.5 p-1 rounded-2xl glass border-white/10 overflow-x-auto max-w-full">
-              <button
-                onClick={() => {
-                  audioAlerts.playClick();
-                  setActiveTab('mic');
-                }}
-                className={`
-                  flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap
-                  ${
-                    activeTab === 'mic'
-                      ? 'bg-gradient-to-r from-[var(--purple-dim)] to-[var(--purple-glow)] text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                      : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
-                  }
-                `}
-              >
-                <Mic className="w-3.5 h-3.5" />
-                <span>Live Mic Shield</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  audioAlerts.playClick();
-                  setActiveTab('phone');
-                }}
-                className={`
-                  flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap
-                  ${
-                    activeTab === 'phone'
-                      ? 'bg-gradient-to-r from-[var(--purple-dim)] to-[var(--purple-glow)] text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                      : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
-                  }
-                `}
-              >
-                <Phone className="w-3.5 h-3.5" />
-                <span>Call Simulator</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  audioAlerts.playClick();
-                  setActiveTab('text');
-                }}
-                className={`
-                  flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap
-                  ${
-                    activeTab === 'text'
-                      ? 'bg-gradient-to-r from-[var(--purple-dim)] to-[var(--purple-glow)] text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                      : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
-                  }
-                `}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Text Analyzer</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  audioAlerts.playClick();
-                  setActiveTab('intel');
-                }}
-                className={`
-                  flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap
-                  ${
-                    activeTab === 'intel'
-                      ? 'bg-gradient-to-r from-[var(--purple-dim)] to-[var(--purple-glow)] text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                      : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
-                  }
-                `}
-              >
-                <Database className="w-3.5 h-3.5" />
-                <span>Threat Intel</span>
-              </button>
-            </nav>
-
-            {/* Quick Header Action Icons */}
-            <div className="flex items-center gap-2">
-              {/* Sound toggle */}
-              <button
-                onClick={handleToggleSound}
-                className="p-2 rounded-xl glass hover:bg-white/10 transition-colors text-[var(--text-muted)] hover:text-white"
-                title={isAudioMuted ? 'Unmute Audio Alarms' : 'Mute Audio Alarms'}
-              >
-                {isAudioMuted ? (
-                  <VolumeX className="w-4 h-4 text-red-400" />
-                ) : (
-                  <Volume2 className="w-4 h-4 text-emerald-400" />
-                )}
-              </button>
-
-              {/* API Keys status trigger */}
-              <button
-                onClick={() => setShowKeysModal(true)}
-                className="px-3 py-1.5 rounded-xl glass hover:bg-white/10 transition-colors text-xs font-mono flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-white border border-[var(--purple-border)]"
-                title="API Keys Status"
-              >
-                <Key className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline">Sarvam: Live</span>
-              </button>
-
-              {/* Tutorial trigger */}
-              <button
-                onClick={() => setShowTutorial(true)}
-                className="p-2 rounded-xl glass hover:bg-white/10 transition-colors text-[var(--text-muted)] hover:text-white"
-                title="How Suraksha Works"
-              >
-                <HelpCircle className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleToggleSound}
+              className="sb-btn sb-btn-ghost w-11 h-11 p-0 rounded-full"
+              aria-label={isAudioMuted ? 'Turn warning sounds on' : 'Turn warning sounds off'}
+              aria-pressed={!isAudioMuted}
+            >
+              {isAudioMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
+            <button type="button" onClick={() => setShowKeysModal(true)} className="sb-btn sb-btn-ghost w-11 h-11 p-0 rounded-full" aria-label="Keys and services">
+              <KeyRound className="w-5 h-5" />
+            </button>
+            <button type="button" onClick={() => setShowTutorial(true)} className="sb-btn sb-btn-ghost w-11 h-11 p-0 rounded-full" aria-label="How it works">
+              <HelpCircle className="w-5 h-5" />
+            </button>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Global Threat Alert Bar if HIGH or CRITICAL RISK detected */}
-        {(riskLevel === 'HIGH' || riskLevel === 'CRITICAL') && (
-          <div className={`${riskLevel === 'CRITICAL' ? 'bg-rose-950/90 border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.3)]' : 'bg-red-950/80 border-red-500/50'} border-b py-2.5 px-4 backdrop-blur-md animate-pulse`}>
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 text-xs">
-              <div className="flex items-center gap-2 text-red-100 font-semibold">
-                <Flame className="w-4 h-4 text-rose-400 animate-bounce flex-shrink-0" />
-                <span>
-                  {riskLevel === 'CRITICAL'
-                    ? 'EMERGENCY SCAM INTERCEPT: Active extortion or OTP theft pattern identified! Do not comply or disclose details.'
-                    : 'HIGH FRAUD ALERT: High probability scam detected in caller speech! Never enter your UPI PIN or share OTP.'}
-                </span>
-              </div>
-              <button
-                onClick={() => setActiveTab('phone')}
-                className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] uppercase transition-colors flex-shrink-0"
-              >
-                View Call HUD
-              </button>
-            </div>
-          </div>
-        )}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        {/* Home stays mounted so listening carries on while you look at other sections. */}
+        <div hidden={activeTab !== 'mic'} className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          <section aria-label="Scam check" className="lg:col-span-5 lg:sticky lg:top-28">
+            <GuardianHome
+              listening={listening}
+              tone={tone}
+              level={audioLevel}
+              onToggle={toggleListening}
+              records={history.records}
+            />
+          </section>
+          <section aria-label="This call" className="lg:col-span-7 flex flex-col gap-5">
+            <RiskDisplay assessment={activeRisk} isListening={listening} onOpenAlert={alert ? undefined : reopenAlert} />
+            <LiveVoiceTester
+              ref={voiceRef}
+              onAssessmentUpdate={handleAssessment}
+              onAudioLevelChange={setAudioLevel}
+              onRecordingChange={handleRecordingChange}
+              activeRisk={activeRisk}
+            />
+          </section>
+        </div>
 
-        {/* Main Body View */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
-          {/* Active Tab View */}
-          {activeTab === 'mic' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {activeTab === 'phone' && (
+          <div className="flex flex-col gap-6">
+            <PhoneCallMockup
+              onAnalyzeSegment={handleAnalyzeSegment}
+              activeRisk={activeRisk}
+              onCallStart={() => history.addCheck('call')}
+              onRegisterHangUp={registerHangUp}
+            />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-7">
-                <LiveVoiceTester
-                  onAssessmentUpdate={setActiveRisk}
-                  onAudioLevelChange={setAudioLevel}
-                  activeRisk={activeRisk}
-                />
-              </div>
-              <div className="lg:col-span-5 space-y-6">
-                <RiskDisplay assessment={activeRisk} isListening={true} />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'phone' && (
-            <div className="space-y-6">
-              <PhoneCallMockup
-                onAnalyzeSegment={handleAnalyzeSegment}
-                activeRisk={activeRisk}
-              />
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-7">
-                  <RiskDisplay assessment={activeRisk} isListening={false} />
-                </div>
-                <div className="lg:col-span-5">
-                  <TranscriptPanel segments={transcriptHistory} isListening={false} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'text' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              <div className="lg:col-span-7 space-y-6">
-                <TextInputPanel
-                  onAnalyze={handleAnalyzeText}
-                  isProcessing={isProcessingText}
-                />
-                <RiskDisplay assessment={activeRisk} isListening={false} />
+                <RiskDisplay assessment={activeRisk} isListening={false} onOpenAlert={alert ? undefined : reopenAlert} />
               </div>
               <div className="lg:col-span-5">
                 <TranscriptPanel segments={transcriptHistory} isListening={false} />
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {activeTab === 'intel' && (
-            <div className="space-y-6">
-              <ThreatIntelPanel />
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-7">
-                  <RiskDisplay assessment={activeRisk} isListening={false} />
-                </div>
-                <div className="lg:col-span-5">
-                  <TranscriptPanel segments={transcriptHistory} isListening={false} />
-                </div>
+        {activeTab === 'text' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="lg:col-span-7 flex flex-col gap-6">
+              <TextInputPanel onAnalyze={handleAnalyzeText} isProcessing={isProcessingText} />
+              <RiskDisplay assessment={activeRisk} isListening={false} onOpenAlert={alert ? undefined : reopenAlert} />
+            </div>
+            <div className="lg:col-span-5">
+              <TranscriptPanel segments={transcriptHistory} isListening={false} />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'intel' && (
+          <div className="flex flex-col gap-6">
+            <ThreatIntelPanel />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-7">
+                <RiskDisplay assessment={activeRisk} isListening={false} onOpenAlert={alert ? undefined : reopenAlert} />
+              </div>
+              <div className="lg:col-span-5">
+                <TranscriptPanel segments={transcriptHistory} isListening={false} />
               </div>
             </div>
-          )}
-        </main>
+          </div>
+        )}
+      </main>
 
-        {/* Footer with Live System Status */}
-        <footer className="mt-auto border-t border-[var(--glass-border)]">
-          <StatusBar />
-        </footer>
-      </div>
+      <footer className="mt-auto border-t border-line">
+        <StatusBar />
+      </footer>
 
-      {/* Modals */}
+      {alert && (
+        <ScamAlert
+          key={alertRun}
+          kind={alert.kind}
+          chips={alert.chips}
+          run={alertRun - 1}
+          premium={edition === 'premium'}
+          askedAt={alert.askedAt}
+          {...alertActions(alert)}
+        />
+      )}
       <TutorialModal isOpen={showTutorial} onClose={handleCloseTutorial} />
       <KeysModal isOpen={showKeysModal} onClose={() => setShowKeysModal(false)} />
     </div>

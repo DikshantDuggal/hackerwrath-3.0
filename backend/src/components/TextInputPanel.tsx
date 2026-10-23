@@ -1,29 +1,29 @@
 import { useState } from 'react';
-import { Send, Sparkles } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 
 const DEMO_SCENARIOS = [
   {
-    label: '🇮🇳 Hindi QR Scam',
+    label: 'QR scam · Hindi',
     text: 'भाई मैं आर्मी में हूँ, क्यूआर भेज रहा हूँ, स्कैन करो पेमेंट तुरंत आ जाएगा।',
   },
   {
-    label: '🏛️ RBI Impersonation',
+    label: 'Fake RBI officer',
     text: 'I am calling from RBI Cyber Crime Branch. An arrest warrant is issued against your Aadhaar. Install AnyDesk and share the OTP immediately.',
   },
   {
-    label: '🔒 OTP Request (Hindi)',
+    label: 'OTP ask · Hinglish',
     text: 'Aapke phone pe ek OTP aaya hai, jaldi se batao. Account block ho jayega agar nahi bataya.',
   },
   {
-    label: '✅ Safe - Protective Advice',
+    label: 'Safety advice, not an ask',
     text: 'Never share your OTP or UPI PIN with anyone on a phone call. Kabhi bhi kisi ko OTP mat batana.',
   },
   {
-    label: '🛒 Legitimate Buyer',
+    label: 'A real buyer',
     text: 'Can you send me your QR? I\'ll pay you now. I am interested in the refrigerator you listed.',
   },
   {
-    label: '🇵🇦 Punjabi OTP Scam',
+    label: 'OTP ask · Punjabi',
     text: 'ਤੁਹਾਡੇ ਫੋਨ ਤੇ ਓਟੀਪੀ ਆਇਆ ਹੋਣਾ, ਮੈਨੂੰ ਦੱਸੋ ਜਲਦੀ। ਖਾਤਾ ਬੰਦ ਹੋ ਜਾਵੇਗਾ।',
   },
 ];
@@ -43,19 +43,20 @@ export default function TextInputPanel({ onAnalyze, isProcessing }: TextInputPan
   };
 
   return (
-    <div className="glass-card p-5">
-      <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-4 flex items-center gap-2">
-        <Sparkles className="w-4 h-4 text-[var(--purple-bright)]" />
-        Text Analysis
-      </h3>
+    <div className="sb-card p-5 sm:p-6">
+      <div className="sb-eyebrow">Text check</div>
+      <h3 className="text-[22px] leading-7 font-extrabold text-head mt-1 mb-4">What did the caller say?</h3>
 
-      {/* Input */}
       <div className="relative mb-4">
+        <label htmlFor="sb-text-check" className="sr-only">
+          What the caller said
+        </label>
         <textarea
+          id="sb-text-check"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Paste or type a suspicious transcript here..."
-          className="glass-input w-full p-4 pr-12 min-h-[100px] resize-none text-sm"
+          placeholder="Type or paste their words, in English, Hindi or Punjabi…"
+          className="sb-input w-full p-4 pr-16 min-h-[120px] resize-none text-[16px]"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
               handleSubmit();
@@ -63,28 +64,28 @@ export default function TextInputPanel({ onAnalyze, isProcessing }: TextInputPan
           }}
         />
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={!text.trim() || isProcessing}
-          className="absolute bottom-3 right-3 p-2 rounded-lg bg-[var(--purple-dim)] hover:bg-[var(--purple-glow)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label="Check these words"
+          className="sb-btn sb-btn-primary absolute bottom-3 right-3 w-11 h-11 p-0 rounded-full"
         >
-          <Send className="w-4 h-4 text-white" />
+          <ArrowUp className={`w-5 h-5 ${isProcessing ? 'animate-pulse' : ''}`} />
         </button>
       </div>
 
-      {/* Demo Scenarios */}
-      <div>
-        <p className="text-xs text-[var(--text-muted)] mb-2">Quick test scenarios:</p>
-        <div className="flex flex-wrap gap-2">
-          {DEMO_SCENARIOS.map((scenario, i) => (
-            <button
-              key={i}
-              onClick={() => setText(scenario.text)}
-              className="text-xs px-3 py-1.5 rounded-full glass hover:bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all border border-transparent hover:border-[var(--purple-dim)]/30"
-            >
-              {scenario.label}
-            </button>
-          ))}
-        </div>
+      <p className="text-[12px] font-bold tracking-[0.12em] uppercase text-faint mb-2">Or try one</p>
+      <div className="flex flex-wrap gap-2">
+        {DEMO_SCENARIOS.map((scenario) => (
+          <button
+            key={scenario.label}
+            type="button"
+            onClick={() => setText(scenario.text)}
+            className="sb-chip bg-accent-soft text-on-accent-soft hover:bg-accent hover:text-on-accent transition-colors active:scale-95"
+          >
+            {scenario.label}
+          </button>
+        ))}
       </div>
     </div>
   );
