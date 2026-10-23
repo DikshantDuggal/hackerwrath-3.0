@@ -249,6 +249,18 @@ export default function App() {
 
             {/* Quick Header Action Icons */}
             <div className="flex items-center gap-2">
+              {/* Standalone Spellbreaker Preview Link */}
+              <a
+                href="/preview.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-xl glass hover:bg-white/10 transition-colors text-xs font-mono flex items-center gap-1.5 text-blue-300 hover:text-white border border-blue-500/30"
+                title="Launch Standalone Spellbreaker Interactive Preview"
+              >
+                <Phone className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden sm:inline">Spellbreaker UI</span>
+              </a>
+
               {/* Sound toggle */}
               <button
                 onClick={handleToggleSound}

@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edgerunners Live Scam Protection - Frontend</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --nordic-bg: #FAFAF8;
+      --card-bg: #FFFFFF;
+      --cool-grey: #E6E8EB;
+      --charcoal: #1F2937;
+      --slate: #4B5563;
+      --outline: #C9CDD3;
+      --editorial-blue: #226192;
+      --editorial-dark: #123A58;
+      --editorial-container: #E3EDF5;
+      --amber-bg: #FFF4DC;
+      --amber-border: #E8A317;
+      --amber-icon: #B26A00;
+      --amber-text: #6B4300;
+      --red-bg: #FDECEB;
+      --red-border: #D92D20;
+      --red-action: #B42318;
+      --red-text: #8A1C14;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+    .phone-container {
+      width: 390px;
+      height: 780px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 12px #262a30, 0 0 0 14px #1a1c20;
+    }
+    @keyframes pulse-soft {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.14); }
+    }
+    .pulse-warning {
+      animation: pulse-soft 0.9s ease-in-out infinite;
+    }
+    @keyframes ripple {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    .ripple-ring {
+      animation: ripple 1.8s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+    }
+    .slide-up {
+      animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .touch-give:active {
+      transform: scale(0.96);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 flex flex-col items-center justify-center">
+
+  <div class="max-w-5xl w-full flex flex-col md:flex-row items-center justify-center gap-8 my-4">
+    
+    <!-- Phone Device Shell -->
+    <div class="relative phone-container bg-[#FAFAF8] text-[#1F2937] rounded-[48px] overflow-hidden flex flex-col border border-slate-700 shrink-0">
+      
+      <!-- Top Status Bar -->
+      <div class="h-10 px-6 pt-3 flex justify-between items-center text-xs font-semibold text-slate-700 bg-transparent z-40">
+        <span id="phone-time">15:39</span>
+        <div class="w-24 h-4 bg-black rounded-full mx-auto -mt-1"></div>
+        <div class="flex items-center space-x-1 text-slate-600">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M17.778 8.222c-4.296-4.296-11.26-4.296-15.556 0A1 1 0 01.808 6.808c5.076-5.077 13.308-5.077 18.384 0a1 1 0 01-1.414 1.414zM14.95 11.05a7 7 0 00-9.9 0 1 1 0 01-1.414-1.414 9 9 0 0112.728 0 1 1 0 01-1.414 1.414zm-2.829 2.828a3 3 0 00-4.242 0 1 1 0 01-1.415-1.414 5 5 0 017.072 0 1 1 0 01-1.415 1.414zM10 16a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2H4zm12 5V7a1 1 0 00-1-1H3a1 1 0 00-1 1v6a1 1 0 001 1h12a1 1 0 001-1v-2h1a1 1 0 001-1v-2a1 1 0 00-1-1h-1z"/></svg>
+        </div>
+      </div>
+
+      <!-- App Viewport -->
+      <div id="app-viewport" class="relative flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
+
+        <!-- 1. SIGN IN SCREEN -->
+        <div id="screen-signin" class="screen flex flex-col p-6 space-y-5">
+          <div class="flex items-center space-x-2.5 text-[#226192] pt-2">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <span class="font-bold text-lg tracking-wide">Edgerunners</span>
+          </div>
+          <div>
+            <h1 class="text-2xl font-bold text-[#1F2937]">Sign in</h1>
+            <p class="text-sm text-[#4B5563] mt-1">Use the demo account your team shared.</p>
+          </div>
+          
+          <div class="space-y-4 pt-2">
+            <div>
+              <label class="block text-xs font-semibold text-[#4B5563] mb-1">Username</label>
+              <input id="input-username" type="text" value="demo-user" class="w-full px-3.5 py-3 rounded-xl border border-[#C9CDD3] bg-white text-[#1F2937] text-sm focus:outline-none focus:border-[#226192] focus:ring-1 focus:ring-[#226192]">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-[#4B5563] mb-1">Password</label>
+              <input id="input-password" type="password" value="demo-pass123" class="w-full px-3.5 py-3 rounded-xl border border-[#C9CDD3] bg-white text-[#1F2937] text-sm focus:outline-none focus:border-[#226192] focus:ring-1 focus:ring-[#226192]">
+            </div>
+          </div>
+
+          <div id="signin-error" class="hidden text-xs text-red-600 font-medium"></div>
+
+          <button id="btn-signin" onclick="handleSignIn()" class="touch-give w-full mt-4 py-3.5 bg-[#226192] hover:bg-[#1a4d74] text-white font-medium text-sm rounded-xl shadow-sm transition">
+            Sign in
+          </button>
+
+          <p class="text-xs text-[#4B5563] text-center pt-3">
+            Server: <span class="font-mono text-slate-500" id="server-url-display">http://localhost:8000</span>
+          </p>
+        </div>
+
+        <!-- 2. HOME SCREEN -->
+        <div id="screen-home" class="screen hidden flex flex-col p-6 space-y-4">
+          <!-- Brand -->
+          <div class="flex items-center space-x-2 text-[#226192]">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <span class="font-bold text-base">Edgerunners</span>
+          </div>
+
+          <!-- Headline -->
+          <h1 id="lbl-headline" class="text-xl font-bold text-[#1F2937] leading-snug">Protection during your calls</h1>
+
+          <!-- Nordic Landscape Illustration Canvas -->
+          <div class="w-full h-20 rounded-xl overflow-hidden bg-white border border-[#E6E8EB] relative">
+            <canvas id="nordic-canvas" class="w-full h-full"></canvas>
+          </div>
+
+          <!-- Language Selector -->
+          <div class="space-y-1.5">
+            <div id="lbl-lang-title" class="text-xs font-semibold text-[#4B5563]">Language</div>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="setLanguage('en')" id="chip-en" class="touch-give py-2.5 rounded-xl border border-[#226192] bg-[#226192] text-white text-xs font-semibold">English</button>
+              <button onclick="setLanguage('hi')" id="chip-hi" class="touch-give py-2.5 rounded-xl border border-[#C9CDD3] bg-white text-[#1F2937] text-xs font-semibold">हिन्दी</button>
+              <button onclick="setLanguage('pa')" id="chip-pa" class="touch-give py-2.5 rounded-xl border border-[#C9CDD3] bg-white text-[#1F2937] text-xs font-semibold">ਪੰਜਾਬੀ</button>
+            </div>
+          </div>
+
+          <!-- Setting: Expecting Payment -->
+          <div onclick="toggleExpectingPayment()" class="touch-give bg-white border border-[#E6E8EB] rounded-2xl p-4 flex items-center justify-between cursor-pointer shadow-sm">
+            <div class="pr-2">
+              <div id="lbl-expecting-title" class="font-semibold text-sm text-[#1F2937]">I'm expecting a payment</div>
+              <div id="lbl-expecting-sub" class="text-xs text-[#4B5563] mt-0.5">Helps spot requests that would make you pay instead</div>
+            </div>
+            <!-- Switch -->
+            <div id="switch-expecting" class="w-14 h-8 rounded-full bg-[#C9CDD3] relative transition-colors duration-200 shrink-0">
+              <div id="knob-expecting" class="w-6 h-6 rounded-full bg-white absolute top-1 left-1 shadow-sm transition-all duration-200"></div>
+            </div>
+          </div>
+
+          <!-- Status badge -->
+          <div class="flex items-center space-x-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg w-fit">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="backend-status-pill">Connected to Live Backend</span>
+          </div>
+
+          <!-- Demo Call Card -->
+          <div class="bg-white border border-[#E6E8EB] rounded-2xl p-4 space-y-3 shadow-sm">
+            <div>
+              <div id="lbl-demo-title" class="font-semibold text-sm text-[#1F2937]">Demo call</div>
+              <div id="lbl-demo-sub" class="text-xs text-[#4B5563]">Plays a scripted call so you can see the warnings.</div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button onclick="startDemoScenario('qr_scan')" class="touch-give py-2.5 px-3 bg-white border border-[#226192] text-[#226192] hover:bg-[#E3EDF5] rounded-xl text-xs font-semibold transition">
+                QR scan
+              </button>
+              <button onclick="startDemoScenario('otp')" class="touch-give py-2.5 px-3 bg-white border border-[#226192] text-[#226192] hover:bg-[#E3EDF5] rounded-xl text-xs font-semibold transition">
+                OTP
+              </button>
+              <button onclick="startDemoScenario('harmless')" class="touch-give py-2.5 px-3 bg-white border border-[#226192] text-[#226192] hover:bg-[#E3EDF5] rounded-xl text-xs font-semibold transition">
+                Harmless
+              </button>
+              <button onclick="startDemoScenario('unavailable')" class="touch-give py-2.5 px-3 bg-white border border-[#226192] text-[#226192] hover:bg-[#E3EDF5] rounded-xl text-xs font-semibold transition">
+                Unavailable
+              </button>
+            </div>
+          </div>
+
+          <button onclick="handleSignOut()" class="text-xs font-medium text-[#4B5563] hover:text-red-600 text-center py-2 transition">
+            Sign out
+          </button>
+        </div>
+
+        <!-- 3. INCOMING CALL SCREEN -->
+        <div id="screen-incoming" class="screen hidden flex flex-col items-center justify-between p-8 text-center flex-1">
+          <div class="pt-6 space-y-4 flex flex-col items-center w-full">
+            <span class="text-xs uppercase tracking-wider text-[#4B5563] font-semibold">Incoming call</span>
+            
+            <div class="relative my-4">
+              <div class="absolute inset-0 rounded-full bg-[#226192] opacity-30 ripple-ring"></div>
+              <div class="w-24 h-24 rounded-full bg-[#E3EDF5] flex items-center justify-center text-[#226192] shadow-sm relative z-10">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+              </div>
+            </div>
+
+            <h2 class="text-2xl font-bold text-[#1F2937]">Unknown number</h2>
+            <p id="incoming-caller-id" class="text-sm font-medium text-[#4B5563]">+91 98765 43210</p>
+
+            <div class="inline-flex items-center space-x-2 bg-[#E3EDF5] text-[#123A58] px-3.5 py-1.5 rounded-full text-xs font-medium">
+              <svg class="w-4 h-4 text-[#226192]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              <span>Scam check on</span>
+            </div>
+          </div>
+
+          <!-- Answer / Decline -->
+          <div class="w-full grid grid-cols-2 gap-4 pb-6">
+            <button onclick="declineCall()" class="touch-give py-3.5 bg-white border-2 border-[#B42318] text-[#B42318] rounded-2xl font-semibold text-sm transition">
+              Decline
+            </button>
+            <button onclick="answerCall()" class="touch-give py-3.5 bg-[#226192] text-white rounded-2xl font-semibold text-sm shadow-md transition">
+              Answer
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. IN-CALL SCREEN -->
+        <div id="screen-incall" class="screen hidden flex flex-col justify-between p-6 flex-1">
+          <!-- Call Header -->
+          <div class="text-center pt-2 space-y-1">
+            <h2 id="incall-caller-id" class="text-lg font-semibold text-[#1F2937]">+91 98765 43210</h2>
+            <p id="incall-timer" class="text-xs text-[#4B5563]">Unknown number · 00:00</p>
+          </div>
+
+          <!-- Dynamic Status Panel -->
+          <div id="status-panel" class="bg-[#E3EDF5] border border-[#226192]/30 rounded-2xl p-4 transition-all duration-300">
+            <div class="flex items-start space-x-3.5">
+              <div id="status-icon-wrap" class="p-1">
+                <svg id="status-icon" class="w-6 h-6 text-[#226192]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z"/></svg>
+              </div>
+              <div class="flex-1">
+                <h3 id="status-title" class="text-sm font-bold text-[#123A58]">Scam check on · Listening</h3>
+                <p id="status-subtitle" class="text-xs text-[#123A58]/80 mt-0.5 hidden"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Waveform Canvas -->
+          <div class="w-full h-32 flex items-center justify-center my-4">
+            <canvas id="waveform-canvas" class="w-full h-full"></canvas>
+          </div>
+
+          <!-- Call Controls: Mute, Speaker, End Call -->
+          <div class="flex justify-around items-center pb-4">
+            <!-- Mute -->
+            <div class="flex flex-col items-center space-y-1.5">
+              <button id="btn-mute" onclick="toggleMute()" class="touch-give w-14 h-14 rounded-full border-2 border-[#C9CDD3] bg-white flex items-center justify-center text-[#1F2937] transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/></svg>
+              </button>
+              <span class="text-xs text-[#4B5563]">Mute</span>
+            </div>
+            <!-- Speaker -->
+            <div class="flex flex-col items-center space-y-1.5">
+              <button id="btn-speaker" onclick="toggleSpeaker()" class="touch-give w-14 h-14 rounded-full border-2 border-[#C9CDD3] bg-white flex items-center justify-center text-[#1F2937] transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+              </button>
+              <span class="text-xs text-[#4B5563]">Speaker</span>
+            </div>
+            <!-- End Call -->
+            <div class="flex flex-col items-center space-y-1.5">
+              <button onclick="endCall('user_ended')" class="touch-give w-14 h-14 rounded-full bg-[#B42318] flex items-center justify-center text-white shadow-md transition">
+                <svg class="w-6 h-6 rotate-[135deg]" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 4V3z"/></svg>
+              </button>
+              <span class="text-xs text-[#4B5563]">End call</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. RISK ALERT SHEET (OVERLAY) -->
+        <div id="screen-alert" class="hidden absolute inset-0 z-30 bg-[#FAFAF8] p-6 flex flex-col justify-between slide-up">
+          <div class="space-y-4">
+            <!-- Warning Banner -->
+            <div id="alert-banner" class="rounded-2xl p-4 border flex items-center justify-between bg-[#FFF4DC] border-[#E8A317] text-[#6B4300]">
+              <div class="flex items-center space-x-2.5">
+                <svg id="alert-banner-icon" class="w-6 h-6 text-[#B26A00]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <span id="alert-level-text" class="text-base font-bold">Possible risk</span>
+              </div>
+              <span class="text-xs font-semibold uppercase tracking-wider opacity-80">Automatic check</span>
+            </div>
+
+            <!-- Title & Body -->
+            <div class="space-y-2 pt-1">
+              <h2 id="alert-title" class="text-lg font-bold text-[#1F2937] leading-snug">
+                They asked you to scan a QR code to receive money.
+              </h2>
+              <p id="alert-body" class="text-xs text-[#4B5563] leading-relaxed">
+                Receiving money does not require scanning a QR code or entering your UPI PIN.
+              </p>
+            </div>
+
+            <!-- Next Step Card -->
+            <div class="bg-white border border-[#C9CDD3] rounded-2xl p-4 space-y-1 shadow-sm">
+              <div class="text-xs font-semibold text-[#4B5563] uppercase tracking-wider">Next step</div>
+              <p id="alert-next" class="text-xs font-medium text-[#1F2937]">
+                End the call. Check the payment in your own bank app.
+              </p>
+            </div>
+
+            <!-- Spoken Warning Indicator -->
+            <div class="flex items-center space-x-2 text-xs text-[#4B5563] pt-1">
+              <svg class="w-4 h-4 text-[#226192] animate-bounce" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+              <span>Spoken warning cue played</span>
+            </div>
+          </div>
+
+          <!-- Alert Actions -->
+          <div class="space-y-3 pb-2">
+            <button onclick="endCall('user_ended')" class="touch-give w-full py-3.5 bg-[#B42318] text-white rounded-2xl font-bold text-sm shadow-md flex items-center justify-center space-x-2">
+              <svg class="w-5 h-5 rotate-[135deg]" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 4V3z"/></svg>
+              <span>End call</span>
+            </button>
+            <button onclick="continueAfterAlert()" class="touch-give w-full py-3 bg-white border border-[#C9CDD3] text-[#1F2937] hover:bg-slate-50 rounded-2xl font-medium text-xs">
+              Continue call
+            </button>
+          </div>
+        </div>
+
+        <!-- 6. CALL ENDED SCREEN -->
+        <div id="screen-ended" class="screen hidden flex flex-col items-center justify-center p-8 text-center flex-1 space-y-5">
+          <div class="w-20 h-20 rounded-full bg-[#E6E8EB] flex items-center justify-center text-[#4B5563]">
+            <svg class="w-10 h-10 rotate-[135deg]" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 4V3z"/></svg>
+          </div>
+          <div>
+            <h2 id="ended-title" class="text-xl font-bold text-[#1F2937]">Call ended</h2>
+            <p class="text-xs text-[#4B5563] mt-2 max-w-[260px] mx-auto leading-relaxed">
+              If you shared a code or made a payment, call your bank from the number on your card.
+            </p>
+          </div>
+          <button onclick="navigate('home')" class="touch-give px-8 py-3.5 bg-[#226192] text-white rounded-xl font-medium text-sm shadow-sm">
+            Back to home
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Bottom Android Pill Bar -->
+      <div class="h-6 flex items-center justify-center bg-transparent z-40">
+        <div class="w-32 h-1 bg-slate-400 rounded-full"></div>
+      </div>
+    </div>
+
+    <!-- Companion Control & Inspector Panel -->
+    <div class="flex-1 max-w-md bg-slate-800/80 backdrop-blur border border-slate-700 rounded-3xl p-6 flex flex-col space-y-6 shadow-xl text-sm">
+      <div class="border-b border-slate-700 pb-3 flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <span>🛡️</span> Interactive Frontend Preview
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Real-time simulation connected to local FastAPI server</p>
+        </div>
+        <span class="text-[11px] bg-blue-900/60 text-blue-300 border border-blue-700/50 px-2.5 py-1 rounded-full font-mono">
+          Compose 1:1
+        </span>
+      </div>
+
+      <!-- Screen Jumper -->
+      <div class="space-y-2">
+        <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Direct Screen Navigation</label>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="navigate('signin')" class="py-2 px-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-medium text-slate-200 transition">
+            1. Sign In
+          </button>
+          <button onclick="navigate('home')" class="py-2 px-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-medium text-slate-200 transition">
+            2. Home
+          </button>
+          <button onclick="navigate('incoming')" class="py-2 px-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-medium text-slate-200 transition">
+            3. Incoming
+          </button>
+          <button onclick="navigate('incall')" class="py-2 px-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-medium text-slate-200 transition">
+            4. In-Call
+          </button>
+          <button onclick="showAlertSheet('qr_receive', 'possible')" class="py-2 px-3 bg-amber-900/40 border border-amber-600/40 hover:bg-amber-800/50 rounded-xl text-xs font-medium text-amber-200 transition">
+            5. Possible Risk
+          </button>
+          <button onclick="showAlertSheet('qr_receive', 'high')" class="py-2 px-3 bg-red-900/40 border border-red-600/40 hover:bg-red-800/50 rounded-xl text-xs font-medium text-red-200 transition">
+            6. High Risk
+          </button>
+        </div>
+      </div>
+
+      <!-- Audio & Haptics Demonstration -->
+      <div class="bg-slate-900/60 border border-slate-700/60 rounded-2xl p-4 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-300">🔊 Synthesized Audio Cues</span>
+          <span class="text-[10px] text-emerald-400 font-mono">Web Audio Active</span>
+        </div>
+        <p class="text-xs text-slate-400">
+          When scam cues trigger, two distinct tones sound within 2s, followed by the spoken alert.
+        </p>
+        <div class="flex gap-2 pt-1">
+          <button onclick="playChimeSound()" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-xs text-slate-200">
+            Play Chime 🔔
+          </button>
+          <button onclick="speakAlert('They asked you to scan a QR code to receive money.')" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-xs text-slate-200">
+            Speak Warning 🗣️
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Event Stream Log -->
+      <div class="space-y-1.5 flex-1 flex flex-col min-h-[140px]">
+        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider">
+          <span>Backend State & WebSocket Feed</span>
+          <button onclick="clearLogs()" class="text-[10px] lowercase text-slate-500 hover:text-slate-300">clear</button>
+        </div>
+        <div id="log-box" class="flex-1 p-3 bg-black/60 rounded-xl border border-slate-800 font-mono text-[11px] text-emerald-400 overflow-y-auto max-h-40 space-y-1">
+          <div>[system] Ready. Connected to http://localhost:8000</div>
+          <div>[auth] Default account: demo-user</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // State management
+    let state = {
+      signedIn: true,
+      scamCheck: true,
+      language: 'en',
+      expectingPayment: false,
+      callActive: false,
+      callId: null,
+      callSeconds: 0,
+      timerInterval: null,
+      waveformAnimation: null,
+      muted: false,
+      speaker: false,
+      currentScenario: null
+    };
+
+    const strings = {
+      en: {
+        headline: "Protection during your calls",
+        scamCheckTitle: "Scam check",
+        scamCheckOn: "On for your calls",
+        scamCheckOff: "Off. Calls won't be checked.",
+        langTitle: "Language",
+        expectingTitle: "I'm expecting a payment",
+        expectingSub: "Helps spot requests that would make you pay instead",
+        demoTitle: "Demo call",
+        demoSub: "Plays a scripted call so you can see the warnings."
+      },
+      hi: {
+        headline: "आपकी कॉल के दौरान सुरक्षा",
+        scamCheckTitle: "स्कैम जांच",
+        scamCheckOn: "आपकी कॉल के लिए चालू",
+        scamCheckOff: "बंद. कॉल की जांच नहीं होगी.",
+        langTitle: "भाषा",
+        expectingTitle: "मुझे पैसे मिलने वाले हैं",
+        expectingSub: "यह उन अनुरोधों को पकड़ने में मदद करता है जो आपसे भुगतान करवाते हैं",
+        demoTitle: "डेमो कॉल",
+        demoSub: "चेतावनी देखने के लिए डेमो कॉल चलाएं।"
+      },
+      pa: {
+        headline: "ਤੁਹਾਡੀਆਂ ਕਾਲਾਂ ਦੌਰਾਨ ਸੁਰੱਖਿਆ",
+        scamCheckTitle: "ਸਕੈਮ ਜਾਂਚ",
+        scamCheckOn: "ਤੁਹਾਡੀਆਂ ਕਾਲਾਂ ਲਈ ਚਾਲੂ",
+        scamCheckOff: "ਬੰਦ. ਕਾਲਾਂ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋਵੇਗੀ.",
+        langTitle: "ਭਾਸ਼ਾ",
+        expectingTitle: "ਮੈਨੂੰ ਪੈਸੇ ਮਿਲਣੇ ਹਨ",
+        expectingSub: "ਉਹਨਾਂ ਧੋਖਿਆਂ ਨੂੰ ਫੜਦਾ ਹੈ ਜਿੱਥੇ ਤੁਹਾਡੇ ਤੋਂ ਪੈਸੇ ਕਟਵਾਏ ਜਾਂਦੇ ਹਨ",
+        demoTitle: "ਡੈਮੋ ਕਾਲ",
+        demoSub: "ਚੇਤਾਵਨੀਆਂ ਦੇਖਣ ਲਈ ਡੈਮੋ ਕਾਲ ਚਲਾਓ।"
+      }
+    };
+
+    function log(msg) {
+      const box = document.getElementById('log-box');
+      const entry = document.createElement('div');
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      box.appendChild(entry);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById('log-box').innerHTML = '';
+    }
+
+    // Audio synthesizer using Web Audio API
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function getAudioContext() {
+      if (!audioCtx) audioCtx = new AudioContext();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playChimeSound() {
+      try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+        
+        // Tone 1: 880 Hz (A5)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.frequency.setValueAtTime(880, now);
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.35);
+
+        // Tone 2: 659.25 Hz (E5)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.frequency.setValueAtTime(659.25, now + 0.15);
+        gain2.gain.setValueAtTime(0.3, now + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.15);
+        osc2.stop(now + 0.6);
+        log("Played alert chime (880Hz -> 660Hz)");
+      } catch (e) {
+        log("AudioContext chime error: " + e.message);
+      }
+    }
+
+    function speakAlert(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.05;
+        window.speechSynthesis.speak(utterance);
+        log(`Spoken alert: "${text}"`);
+      }
+    }
+
+    // Navigation
+    function navigate(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+      document.getElementById('screen-alert').classList.add('hidden');
+      
+      const target = document.getElementById(`screen-${screenId}`);
+      if (target) {
+        target.classList.remove('hidden');
+      }
+
+      if (screenId === 'home') {
+        drawLandscape();
+      }
+      if (screenId === 'incall') {
+        startWaveform();
+      } else {
+        stopWaveform();
+      }
+      log(`Navigated to: ${screenId}`);
+    }
+
+    // Toggle expecting payment
+    function toggleExpectingPayment() {
+      state.expectingPayment = !state.expectingPayment;
+      const sw = document.getElementById('switch-expecting');
+      const knob = document.getElementById('knob-expecting');
+
+      if (state.expectingPayment) {
+        sw.className = "w-14 h-8 rounded-full bg-[#226192] relative transition-colors duration-200";
+        knob.className = "w-6 h-6 rounded-full bg-white absolute top-1 right-1 shadow-sm transition-all duration-200";
+      } else {
+        sw.className = "w-14 h-8 rounded-full bg-[#C9CDD3] relative transition-colors duration-200";
+        knob.className = "w-6 h-6 rounded-full bg-white absolute top-1 left-1 shadow-sm transition-all duration-200";
+      }
+      log(`Expecting payment context: ${state.expectingPayment ? 'ON' : 'OFF'}`);
+    }
+
+    // Language switch
+    function setLanguage(lang) {
+      state.language = lang;
+      ['en', 'hi', 'pa'].forEach(l => {
+        const chip = document.getElementById(`chip-${l}`);
+        if (l === lang) {
+          chip.className = "touch-give py-2.5 rounded-xl border border-[#226192] bg-[#226192] text-white text-xs font-semibold";
+        } else {
+          chip.className = "touch-give py-2.5 rounded-xl border border-[#C9CDD3] bg-white text-[#1F2937] text-xs font-semibold";
+        }
+      });
+      const t = strings[lang];
+      document.getElementById('lbl-headline').textContent = t.headline;
+      document.getElementById('lbl-lang-title').textContent = t.langTitle;
+      document.getElementById('lbl-expecting-title').textContent = t.expectingTitle;
+      document.getElementById('lbl-expecting-sub').textContent = t.expectingSub;
+      document.getElementById('lbl-demo-title').textContent = t.demoTitle;
+      document.getElementById('lbl-demo-sub').textContent = t.demoSub;
+      log(`Language set to: ${lang}`);
+    }
+
+    // Nordic Landscape Canvas drawing (matches Kotlin NordicLandscape 1:1)
+    function drawLandscape() {
+      const canvas = document.getElementById('nordic-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth * 2;
+      canvas.height = canvas.offsetHeight * 2;
+      ctx.scale(2, 2);
+
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Pale pink sun
+      ctx.fillStyle = "#F4BEBB";
+      ctx.beginPath();
+      ctx.arc(w * 0.77, h * 0.33, h * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Back hill (CoolGrey #E6E8EB)
+      ctx.fillStyle = "#E6E8EB";
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.75);
+      ctx.bezierCurveTo(w * 0.18, h * 0.44, w * 0.32, h * 0.5, w * 0.47, h * 0.67);
+      ctx.bezierCurveTo(w * 0.61, h * 0.85, w * 0.76, h * 0.52, w, h * 0.6);
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
+      ctx.fill();
+
+      // Front hill (#D5DCE4)
+      ctx.fillStyle = "#D5DCE4";
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.87);
+      ctx.bezierCurveTo(w * 0.2, h * 0.67, w * 0.38, h * 0.73, w * 0.56, h * 0.85);
+      ctx.bezierCurveTo(w * 0.7, h * 0.94, w * 0.85, h * 0.77, w, h * 0.81);
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
+      ctx.fill();
+
+      // Pine trees (#226192 with alpha 0.35)
+      ctx.fillStyle = "rgba(34, 97, 146, 0.35)";
+      function pine(x, top, half) {
+        ctx.beginPath();
+        ctx.moveTo(x, top);
+        ctx.lineTo(x + half, h * 0.9);
+        ctx.lineTo(x - half, h * 0.9);
+        ctx.closePath();
+        ctx.fill();
+      }
+      pine(w * 0.18, h * 0.66, w * 0.03);
+      pine(w * 0.25, h * 0.73, w * 0.024);
+    }
+
+    // Waveform Animation (matches Kotlin Waveform Canvas)
+    let wavePhase = 0;
+    function startWaveform() {
+      stopWaveform();
+      const canvas = document.getElementById('waveform-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const bars = [0.25, 0.55, 0.8, 0.45, 1.0, 0.65, 0.35, 0.75, 0.5, 0.2];
+
+      function render() {
+        canvas.width = canvas.offsetWidth * 2;
+        canvas.height = canvas.offsetHeight * 2;
+        ctx.scale(2, 2);
+        const w = canvas.offsetWidth;
+        const h = canvas.offsetHeight;
+        ctx.clearRect(0, 0, w, h);
+
+        const gap = w / (bars.length + 1);
+        ctx.lineCap = 'round';
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "rgba(34, 97, 146, 0.4)";
+
+        bars.forEach((base, i) => {
+          const wobble = 0.75 + 0.25 * Math.sin(wavePhase + i * 0.7);
+          const barH = h * base * wobble * 0.7;
+          const x = gap * (i + 1);
+
+          ctx.beginPath();
+          ctx.moveTo(x, (h - barH) / 2);
+          ctx.lineTo(x, (h + barH) / 2);
+          ctx.stroke();
+        });
+
+        wavePhase += 0.07;
+        state.waveformAnimation = requestAnimationFrame(render);
+      }
+      render();
+    }
+
+    function stopWaveform() {
+      if (state.waveformAnimation) {
+        cancelAnimationFrame(state.waveformAnimation);
+        state.waveformAnimation = null;
+      }
+    }
+
+    // Demo Scenarios Handler
+    async function startDemoScenario(scenario) {
+      state.currentScenario = scenario;
+      log(`Starting demo scenario: ${scenario}`);
+      
+      // Try to register call with live backend
+      try {
+        const loginRes = await fetch('http://localhost:8000/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'demo-user', password: 'demo-pass123' })
+        });
+        if (loginRes.ok) {
+          const { app_token } = await loginRes.json();
+          const callRes = await fetch('http://localhost:8000/api/demo/calls', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${app_token}`
+            },
+            body: JSON.stringify({ scenario: scenario })
+          });
+          if (callRes.ok) {
+            const data = await callRes.json();
+            state.callId = data.call_id;
+            log(`Backend call registered: ${state.callId}`);
+          }
+        }
+      } catch (e) {
+        log(`Live backend note: ${e.message} (proceeding in local simulation)`);
+      }
+
+      // Step 1: Incoming call rings
+      navigate('incoming');
+    }
+
+    function answerCall() {
+      navigate('incall');
+      state.callActive = true;
+      state.callSeconds = 0;
+      clearInterval(state.timerInterval);
+      
+      state.timerInterval = setInterval(() => {
+        state.callSeconds++;
+        const m = String(Math.floor(state.callSeconds / 60)).padStart(2, '0');
+        const s = String(state.callSeconds % 60).padStart(2, '0');
+        document.getElementById('incall-timer').textContent = `Unknown number · ${m}:${s}`;
+      }, 1000);
+
+      log("Call answered. Scam check active.");
+      setStatus('listening');
+
+      // If this is a scam scenario, schedule the realistic warning sequence!
+      if (state.currentScenario === 'qr_scan') {
+        // At 3 seconds: Checking (Amber warning)
+        setTimeout(() => {
+          if (!state.callActive) return;
+          setStatus('checking');
+        }, 3000);
+
+        // At 5 seconds: Risk alert sheet + Chime + Voice
+        setTimeout(() => {
+          if (!state.callActive) return;
+          const level = state.expectingPayment ? 'high' : 'possible';
+          showAlertSheet('qr_receive', level);
+          playChimeSound();
+          speakAlert("Warning: do not scan any QR code or enter your UPI PIN to receive money.");
+        }, 5000);
+      } else if (state.currentScenario === 'otp') {
+        setTimeout(() => {
+          if (!state.callActive) return;
+          setStatus('checking');
+        }, 3000);
+        setTimeout(() => {
+          if (!state.callActive) return;
+          showAlertSheet('otp_share', 'high');
+          playChimeSound();
+          speakAlert("Warning: never share your OTP on a call.");
+        }, 5000);
+      } else if (state.currentScenario === 'unavailable') {
+        setTimeout(() => {
+          if (!state.callActive) return;
+          setStatus('unavailable');
+        }, 2000);
+      }
+    }
+
+    function declineCall() {
+      clearInterval(state.timerInterval);
+      state.callActive = false;
+      document.getElementById('ended-title').textContent = "Call declined";
+      navigate('ended');
+      log("Call declined.");
+    }
+
+    function endCall(reason) {
+      clearInterval(state.timerInterval);
+      state.callActive = false;
+      document.getElementById('ended-title').textContent = reason === 'caller_ended' ? "The caller ended the call" : "Call ended";
+      navigate('ended');
+      log(`Call ended (${reason}).`);
+    }
+
+    function continueAfterAlert() {
+      document.getElementById('screen-alert').classList.add('hidden');
+      setStatus('continued');
+      log("User selected: Continue call anyway.");
+    }
+
+    function setStatus(mode) {
+      const panel = document.getElementById('status-panel');
+      const title = document.getElementById('status-title');
+      const sub = document.getElementById('status-subtitle');
+      const icon = document.getElementById('status-icon');
+      const iconWrap = document.getElementById('status-icon-wrap');
+
+      iconWrap.classList.remove('pulse-warning');
+
+      if (mode === 'listening') {
+        panel.className = "bg-[#E3EDF5] border border-[#226192]/30 rounded-2xl p-4 transition-all duration-300";
+        title.className = "text-sm font-bold text-[#123A58]";
+        title.textContent = "Scam check on · Listening";
+        sub.classList.add('hidden');
+        icon.className = "w-6 h-6 text-[#226192]";
+      } else if (mode === 'checking') {
+        panel.className = "bg-[#FFF4DC] border-2 border-[#E8A317] rounded-2xl p-4 transition-all duration-300";
+        title.className = "text-sm font-bold text-[#6B4300]";
+        title.textContent = "Checking a payment request…";
+        sub.className = "text-xs text-[#6B4300] mt-0.5 block";
+        sub.textContent = "Possible risk. Don't share or scan anything yet.";
+        icon.className = "w-6 h-6 text-[#B26A00]";
+        iconWrap.classList.add('pulse-warning');
+        log("Status updated: Checking a payment request (Amber)");
+      } else if (mode === 'unavailable') {
+        panel.className = "bg-[#EEF2F6] border border-[#C9CDD3] rounded-2xl p-4 transition-all duration-300";
+        title.className = "text-sm font-bold text-[#1F2937]";
+        title.textContent = "Protection unavailable right now";
+        sub.className = "text-xs text-[#4B5563] mt-0.5 block";
+        sub.textContent = "Be careful with any payment request.";
+        icon.className = "w-6 h-6 text-[#226192]";
+      } else if (mode === 'continued') {
+        panel.className = "bg-[#E3EDF5] border border-[#226192]/30 rounded-2xl p-4 transition-all duration-300";
+        title.className = "text-sm font-bold text-[#123A58]";
+        title.textContent = "Scam check on · Listening";
+        sub.className = "text-xs text-[#123A58]/80 mt-0.5 block";
+        sub.textContent = "You chose to continue";
+        icon.className = "w-6 h-6 text-[#226192]";
+      }
+    }
+
+    function showAlertSheet(type, level) {
+      const alertScreen = document.getElementById('screen-alert');
+      const banner = document.getElementById('alert-banner');
+      const levelText = document.getElementById('alert-level-text');
+      const icon = document.getElementById('alert-banner-icon');
+      const title = document.getElementById('alert-title');
+      const body = document.getElementById('alert-body');
+      const next = document.getElementById('alert-next');
+
+      if (level === 'high') {
+        banner.className = "rounded-2xl p-4 border flex items-center justify-between bg-[#FDECEB] border-[#D92D20] text-[#8A1C14]";
+        levelText.textContent = "High risk";
+        icon.className = "w-6 h-6 text-[#D92D20]";
+      } else {
+        banner.className = "rounded-2xl p-4 border flex items-center justify-between bg-[#FFF4DC] border-[#E8A317] text-[#6B4300]";
+        levelText.textContent = "Possible risk";
+        icon.className = "w-6 h-6 text-[#B26A00]";
+      }
+
+      if (type === 'otp_share') {
+        title.textContent = "They asked you to share an OTP.";
+        body.textContent = "An OTP can let someone take money or your account. Never share it on a call.";
+        next.textContent = "End the call. If it was your bank, call the number on your card.";
+      } else {
+        title.textContent = "They asked you to scan a QR code to receive money.";
+        body.textContent = "Receiving money does not require scanning a QR code or entering your UPI PIN.";
+        next.textContent = "End the call. Check the payment in your own bank app.";
+      }
+
+      alertScreen.classList.remove('hidden');
+      log(`Alert Sheet presented: [${level.toUpperCase()}] ${type}`);
+    }
+
+    function toggleMute() {
+      state.muted = !state.muted;
+      const btn = document.getElementById('btn-mute');
+      if (state.muted) {
+        btn.className = "touch-give w-14 h-14 rounded-full bg-[#226192] flex items-center justify-center text-white transition";
+      } else {
+        btn.className = "touch-give w-14 h-14 rounded-full border-2 border-[#C9CDD3] bg-white flex items-center justify-center text-[#1F2937] transition";
+      }
+    }
+
+    function toggleSpeaker() {
+      state.speaker = !state.speaker;
+      const btn = document.getElementById('btn-speaker');
+      if (state.speaker) {
+        btn.className = "touch-give w-14 h-14 rounded-full bg-[#226192] flex items-center justify-center text-white transition";
+      } else {
+        btn.className = "touch-give w-14 h-14 rounded-full border-2 border-[#C9CDD3] bg-white flex items-center justify-center text-[#1F2937] transition";
+      }
+    }
+
+    function handleSignIn() {
+      navigate('home');
+      log("Signed in successfully as demo-user.");
+    }
+
+    function handleSignOut() {
+      navigate('signin');
+      log("Signed out.");
+    }
+
+    // Init
+    window.addEventListener('DOMContentLoaded', () => {
+      navigate('home');
+      drawLandscape();
+      window.addEventListener('resize', drawLandscape);
+
+      // Update phone time
+      const now = new Date();
+      document.getElementById('phone-time').textContent = 
+        String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Copy to local.properties (never commit it). Android Studio also writes sdk.dir here.
+
+# Backend base URL. The emulator reaches your computer's localhost at 10.0.2.2.
+# On a real phone, use your computer's LAN address (http://192.168.x.x:8000) or the deployed HTTPS URL.
+api.baseUrl=http://10.0.2.2:8000
+
+# Shows the "Try a demo call" section on Home. Set false for a real-calls-only build.
+demo.enabled=true
+
+# Spellbreaker edition: standard (warm paper, blue) or premium (night, gold).
+ui.edition=standard
+
+# Firebase (push for incoming Twilio calls). Leave empty to run demo calls only.
+firebase.appId=
+firebase.apiKey=
+firebase.projectId=
+firebase.senderId=
