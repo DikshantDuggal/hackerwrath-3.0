@@ -27,10 +27,11 @@ export const CHIP_FOR_CATEGORY: Record<string, string> = {
   FINANCIAL_SOLICITATION: 'Wants money',
   PRESSURE_AND_SECRECY_TACTIC: 'Pressuring you',
   COERCIVE_THREAT: 'Pressuring you',
+  SENSITIVE_DETAIL_MENTION: 'Brings up your card or bank details',
 };
 
 const PATTERNS: Array<[RegExp, string]> = [
-  [/otp|one[\s-]?time|\bcode\b|\bpin\b|cvv|ओटीपी|पिन|ਓਟੀਪੀ|ਪਿੰਨ/i, 'OTP_OR_PIN_REQUEST'],
+  [/otp|one[\s-]?time|\bcode\b|\bpin\b|mpin|cvv|card number|account number|bank details|ओटीपी|पिन|सीवीवी|कार्ड नंबर|ਓਟੀਪੀ|ਪਿੰਨ/i, 'OTP_OR_PIN_REQUEST'],
   [/\bqr\b|scan|क्यूआर|स्कैन|ਕਿਊਆਰ|ਸਕੈਨ/i, 'QR_SCAN_TO_RECEIVE_MONEY'],
   [/anydesk|teamviewer|quick ?support|screen|remote|\bapk\b|install|download/i, 'REMOTE_ACCESS_OR_SCREEN_SHARE'],
   [/arrest|warrant|\bcbi\b|\bed\b|police|court|customs|गिरफ्तार|वारंट/i, 'THREAT_ARREST_OR_LEGAL_ACTION'],
@@ -76,6 +77,7 @@ export function askKindOf(categories: string[]): AskKind {
   if (has('REMOTE_ACCESS_OR_SCREEN_SHARE') || has('SUSPICIOUS_LINK_OR_APK')) return 'remote';
   if (has('THREAT_ARREST_OR_LEGAL_ACTION')) return 'arrest';
   if (has('URGENT_PAYMENT_DEMAND') || has('FINANCIAL_SOLICITATION')) return 'payment';
+  if (has('SENSITIVE_DETAIL_MENTION')) return 'otp';
   return 'general';
 }
 

@@ -150,7 +150,9 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
 
         if (res.ok) {
           const update = await res.json();
-          const assessment: RiskAssessment = update.assessment;
+          // The risk of this line, not the whole session's, so an ordinary line after a scam one
+          // isn't flagged too.
+          const assessment: RiskAssessment = update.moment_assessment ?? update.assessment;
           if (assessment) {
             // Nearest real dialogues from the RAG store, shown under "Sounds like".
             assessment.rag_classification = await fetchRag(text.trim());
@@ -240,7 +242,8 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
 
       // Connect Direct WebSocket to Backend Live Stream
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}/internal/live/browser-stream`;
+      // Pin Sarvam to the chosen language; on "auto" it guesses per slice and can drift.
+      const wsUrl = `${wsProtocol}//${window.location.host}/internal/live/browser-stream?language=${encodeURIComponent(languageCode)}`;
       const ws = new WebSocket(wsUrl);
       liveWsRef.current = ws;
 
@@ -275,10 +278,10 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
             setStoredUtterances((prev) => [newUtterance, ...prev]);
 
             if (onAssessmentUpdate) {
-              const triggered = (data.flaggedKeywords || []).map((k: string) => ({
+              const triggered = (data.flaggedKeywords || []).map((k: string, i: number) => ({
                 indicator_name: k,
                 keyword_or_pattern: k,
-                category: 'SUSPICIOUS_PHRASE',
+                category: data.flaggedCategories?.[i] || 'SUSPICIOUS_PHRASE',
                 weight: 15,
                 matched_text: k,
               }));
