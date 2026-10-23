@@ -53,6 +53,12 @@ async def main():
         qr = qrcode.QRCode()
         qr.add_data(qr_login.url)
         qr.print_ascii(invert=True)
+        try:
+            img = qr.make_image(fill_color="black", back_color="white")
+            img.save(ROOT / "telegram_qr.png")
+            print(f"\n>> High-res QR code image saved to: {ROOT / 'telegram_qr.png'} <<")
+        except Exception:
+            pass
 
         print("\n" + "=" * 65)
         print("Waiting for scan on your phone... (Scan now)")

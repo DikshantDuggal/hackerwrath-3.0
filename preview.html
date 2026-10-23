@@ -650,6 +650,9 @@
           </div>
           
           <div class="flex flex-wrap gap-1.5">
+            <button onclick="setRagPreset('sensitive')" class="text-[10px] px-2 py-0.5 rounded bg-red-950/80 border border-red-700/60 hover:bg-red-900 text-red-200">
+              Sensitive Info
+            </button>
             <button onclick="setRagPreset('qr')" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">
               UPI QR Scam
             </button>
@@ -1800,6 +1803,15 @@
           { example_id: 'scam_bank_otp_09', similarity: 0.95, text: "Your ATM card is temporarily suspended. Read me the 6 digit code sent to your phone." },
           { example_id: 'scam_sim_kyc_21', similarity: 0.91, text: "Airtel verification alert: share the security PIN to keep your SIM active." }
         ];
+      } else if (lower.includes('sensitive') || lower.includes('bank details') || lower.includes('account details') || lower.includes('card details') || lower.includes('credential')) {
+        classification = 'SCAM';
+        riskScore = 95;
+        confidence = 0.98;
+        exp = "Identified direct solicitation demanding sensitive credentials, banking details, or confidential personal information.";
+        citations = [
+          { example_id: 'scam_bank_credentials_08', similarity: 0.96, text: "We need your sensitive bank account details and verification info to prevent immediate account suspension." },
+          { example_id: 'scam_kyc_phish_33', similarity: 0.92, text: "Provide your sensitive information and card details to complete compulsory KYC validation." }
+        ];
       } else if (lower.includes('anydesk') || lower.includes('apk') || lower.includes('teamviewer') || lower.includes('download')) {
         classification = 'SCAM';
         riskScore = 98;
@@ -1823,7 +1835,9 @@
 
     function setRagPreset(type) {
       const input = document.getElementById('rag-input-text');
-      if (type === 'qr') {
+      if (type === 'sensitive') {
+        input.value = "Caller is asking for sensitive info and bank account details.";
+      } else if (type === 'qr') {
         input.value = "Please open your Google Pay and scan this QR code to receive the cashback amount of 5000 rupees.";
       } else if (type === 'otp') {
         input.value = "This is State Bank security division. Your account is blocked. Share the 6-digit OTP sent to your SMS immediately.";
