@@ -6,21 +6,31 @@ interface AstraOrbitalCanvasProps {
   audioLevel?: number; // 0 to 1
 }
 
-interface OrbitingCube {
-  orbitRadiusX: number;
-  orbitRadiusY: number;
-  tiltAngle: number;
-  currentAngle: number;
+interface Planet {
+  orbitA: number; // semi-major axis
+  orbitB: number; // semi-minor axis
+  tilt: number; // inclination angle
+  angle: number; // current orbital position
   speed: number;
-  size: number;
+  radius: number;
   color: string;
   glowColor: string;
-  rotationX: number;
-  rotationY: number;
-  rotationZ: number;
-  rotSpeedX: number;
-  rotSpeedY: number;
+  hasRings?: boolean;
+  ringRadius?: number;
+  ringTilt?: number;
+  hasMoon?: boolean;
+  moonAngle?: number;
+  moonDist?: number;
   trail: Array<{ x: number; y: number; alpha: number }>;
+}
+
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  baseAlpha: number;
+  twinkleSpeed: number;
+  twinklePhase: number;
 }
 
 export default function AstraOrbitalCanvas({
@@ -35,7 +45,8 @@ export default function AstraOrbitalCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
@@ -44,376 +55,326 @@ export default function AstraOrbitalCanvas({
       if (!canvas) return;
       width = canvas.width = window.innerWidth;
       height = canvas.height = window.innerHeight;
+      initStars();
     };
     window.addEventListener('resize', handleResize);
 
     const handleMouseMove = (e: MouseEvent) => {
-      mouseRef.current.targetX = (e.clientX - width / 2) * 0.08;
-      mouseRef.current.targetY = (e.clientY - height / 2) * 0.08;
+      mouseRef.current.targetX = (e.clientX - width / 2) * 0.04;
+      mouseRef.current.targetY = (e.clientY - height / 2) * 0.04;
     };
     window.addEventListener('mousemove', handleMouseMove);
 
-    // Color palettes based on risk state
-    const palettes = {
-      LOW: {
-        coreGlow: 'rgba(192, 132, 252, 0.4)', // Candlelight purple
-        ambientGlow: 'rgba(52, 211, 153, 0.15)', // Emerald mint
-        cubeColors: ['#a855f7', '#34d399', '#c084fc', '#10b981', '#7c3aed'],
-        ringStroke: 'rgba(192, 132, 252, 0.12)',
-        flameCore: '#f3e8ff',
-      },
-      MEDIUM: {
-        coreGlow: 'rgba(251, 191, 36, 0.4)', // Amber candlelight
-        ambientGlow: 'rgba(168, 85, 247, 0.18)',
-        cubeColors: ['#f59e0b', '#fbbf24', '#c084fc', '#d97706'],
-        ringStroke: 'rgba(251, 191, 36, 0.16)',
-        flameCore: '#fef3c7',
-      },
-      HIGH: {
-        coreGlow: 'rgba(239, 68, 68, 0.55)', // Alert Red Candlelight
-        ambientGlow: 'rgba(244, 63, 94, 0.25)',
-        cubeColors: ['#ef4444', '#f87171', '#dc2626', '#fb7185'],
-        ringStroke: 'rgba(239, 68, 68, 0.22)',
-        flameCore: '#fee2e2',
-      },
-      CRITICAL: {
-        coreGlow: 'rgba(255, 45, 85, 0.75)', // Crimson Emergency Alert
-        ambientGlow: 'rgba(239, 68, 68, 0.4)',
-        cubeColors: ['#ff2d55', '#ef4444', '#dc2626', '#e11d48'],
-        ringStroke: 'rgba(255, 45, 85, 0.35)',
-        flameCore: '#ffe4e6',
-      },
-      UNKNOWN: {
-        coreGlow: 'rgba(147, 128, 185, 0.25)',
-        ambientGlow: 'rgba(74, 222, 128, 0.08)',
-        cubeColors: ['#9380b9', '#34d399', '#7e6ba3'],
-        ringStroke: 'rgba(147, 128, 185, 0.1)',
-        flameCore: '#f1e8ff',
-      },
+    // Color definitions based on Obsidian Cosmic design tokens
+    const getThemeColors = () => {
+      switch (riskLevel) {
+        case 'CRITICAL':
+          return {
+            sunCore: '#FFE4E6',
+            sunInner: '#F43F5E',
+            sunOuter: 'rgba(244, 63, 94, 0.45)',
+            sunGlow: 'rgba(225, 29, 72, 0.25)',
+            orbitStroke: 'rgba(244, 63, 94, 0.16)',
+            accent: '#F43F5E',
+          };
+        case 'HIGH':
+          return {
+            sunCore: '#FEE2E2',
+            sunInner: '#EF4444',
+            sunOuter: 'rgba(239, 68, 68, 0.4)',
+            sunGlow: 'rgba(220, 38, 38, 0.2)',
+            orbitStroke: 'rgba(239, 68, 68, 0.14)',
+            accent: '#EF4444',
+          };
+        case 'MEDIUM':
+          return {
+            sunCore: '#FEF3C7',
+            sunInner: '#F2C879',
+            sunOuter: 'rgba(242, 200, 121, 0.35)',
+            sunGlow: 'rgba(217, 119, 6, 0.18)',
+            orbitStroke: 'rgba(242, 200, 121, 0.14)',
+            accent: '#F2C879',
+          };
+        default:
+          return {
+            sunCore: '#FFFFFF',
+            sunInner: '#8B7CFF',
+            sunOuter: 'rgba(114, 215, 232, 0.3)',
+            sunGlow: 'rgba(139, 124, 255, 0.14)',
+            orbitStroke: 'rgba(139, 124, 255, 0.12)',
+            accent: '#8B7CFF',
+          };
+      }
     };
 
-    // Instantiate 7 3D Orbiting Blocks (Astra style)
-    const cubes: OrbitingCube[] = [
+    // Cosmic background starfield
+    let stars: Star[] = [];
+    const initStars = () => {
+      stars = [];
+      const starCount = Math.floor((width * height) / 12000);
+      for (let i = 0; i < starCount; i++) {
+        stars.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          size: Math.random() * 1.5 + 0.4,
+          baseAlpha: Math.random() * 0.5 + 0.15,
+          twinkleSpeed: Math.random() * 0.03 + 0.01,
+          twinklePhase: Math.random() * Math.PI * 2,
+        });
+      }
+    };
+    initStars();
+
+    // Solar System Planets
+    const planets: Planet[] = [
+      // 1. Inner Rocky World (Fast orbit)
       {
-        orbitRadiusX: 180,
-        orbitRadiusY: 65,
-        tiltAngle: -0.35,
-        currentAngle: 0,
+        orbitA: 130,
+        orbitB: 50,
+        tilt: -0.15,
+        angle: 0.8,
         speed: 0.014,
-        size: 18,
-        color: '#c084fc',
-        glowColor: 'rgba(192, 132, 252, 0.7)',
-        rotationX: 0.2,
-        rotationY: 0.3,
-        rotationZ: 0,
-        rotSpeedX: 0.02,
-        rotSpeedY: 0.03,
+        radius: 3.5,
+        color: '#A2A9BA',
+        glowColor: 'rgba(162, 169, 186, 0.4)',
         trail: [],
       },
+      // 2. Cyan Terrestrial World with Moon
       {
-        orbitRadiusX: 240,
-        orbitRadiusY: 85,
-        tiltAngle: 0.25,
-        currentAngle: Math.PI * 0.7,
-        speed: -0.011,
-        size: 22,
-        color: '#34d399',
-        glowColor: 'rgba(52, 211, 153, 0.75)',
-        rotationX: 0.4,
-        rotationY: 0.1,
-        rotationZ: 0.2,
-        rotSpeedX: -0.025,
-        rotSpeedY: 0.015,
-        trail: [],
-      },
-      {
-        orbitRadiusX: 300,
-        orbitRadiusY: 105,
-        tiltAngle: -0.15,
-        currentAngle: Math.PI * 1.3,
+        orbitA: 210,
+        orbitB: 80,
+        tilt: 0.1,
+        angle: 2.4,
         speed: 0.009,
-        size: 15,
-        color: '#a855f7',
-        glowColor: 'rgba(168, 85, 247, 0.6)',
-        rotationX: 0.1,
-        rotationY: 0.5,
-        rotationZ: 0.1,
-        rotSpeedX: 0.018,
-        rotSpeedY: -0.022,
+        radius: 6,
+        color: '#72D7E8',
+        glowColor: 'rgba(114, 215, 232, 0.5)',
+        hasMoon: true,
+        moonAngle: 0,
+        moonDist: 14,
         trail: [],
       },
+      // 3. Ringed Violet Gas Giant (Saturn-like)
       {
-        orbitRadiusX: 130,
-        orbitRadiusY: 50,
-        tiltAngle: 0.55,
-        currentAngle: Math.PI * 0.4,
-        speed: 0.022,
-        size: 12,
-        color: '#6ee7b7',
-        glowColor: 'rgba(110, 231, 183, 0.65)',
-        rotationX: 0.3,
-        rotationY: 0.2,
-        rotationZ: 0.4,
-        rotSpeedX: 0.03,
-        rotSpeedY: 0.03,
+        orbitA: 320,
+        orbitB: 120,
+        tilt: -0.22,
+        angle: 4.1,
+        speed: 0.0055,
+        radius: 9,
+        color: '#8B7CFF',
+        glowColor: 'rgba(139, 124, 255, 0.55)',
+        hasRings: true,
+        ringRadius: 18,
+        ringTilt: -0.3,
         trail: [],
       },
+      // 4. Emerald Ice Giant
       {
-        orbitRadiusX: 360,
-        orbitRadiusY: 125,
-        tiltAngle: -0.45,
-        currentAngle: Math.PI * 1.8,
-        speed: -0.0075,
-        size: 24,
-        color: '#c084fc',
-        glowColor: 'rgba(192, 132, 252, 0.5)',
-        rotationX: 0.5,
-        rotationY: 0.2,
-        rotationZ: 0,
-        rotSpeedX: -0.012,
-        rotSpeedY: 0.02,
+        orbitA: 430,
+        orbitB: 165,
+        tilt: 0.18,
+        angle: 1.2,
+        speed: 0.0038,
+        radius: 7,
+        color: '#63D6A5',
+        glowColor: 'rgba(99, 214, 165, 0.45)',
+        trail: [],
+      },
+      // 5. Outer Golden Dwarf Planet
+      {
+        orbitA: 550,
+        orbitB: 215,
+        tilt: -0.08,
+        angle: 5.5,
+        speed: 0.0022,
+        radius: 4,
+        color: '#F2C879',
+        glowColor: 'rgba(242, 200, 121, 0.4)',
         trail: [],
       },
     ];
 
-    // Background stardust particles
-    const stars: Array<{ x: number; y: number; r: number; alpha: number; pulseSpeed: number }> = [];
-    for (let i = 0; i < 90; i++) {
-      stars.push({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        r: Math.random() * 1.8 + 0.3,
-        alpha: Math.random() * 0.6 + 0.1,
-        pulseSpeed: Math.random() * 0.03 + 0.01,
-      });
-    }
-
     let time = 0;
-
-    // Helper: Draw projected 3D Wireframe / Glass Cube
-    const draw3DCube = (
-      centerX: number,
-      centerY: number,
-      size: number,
-      rotX: number,
-      rotY: number,
-      color: string,
-      glow: string
-    ) => {
-      const half = size / 2;
-      // 8 Vertices of cube
-      const vertices = [
-        [-half, -half, -half],
-        [half, -half, -half],
-        [half, half, -half],
-        [-half, half, -half],
-        [-half, -half, half],
-        [half, -half, half],
-        [half, half, half],
-        [-half, half, half],
-      ];
-
-      // Rotate around X and Y
-      const cosX = Math.cos(rotX);
-      const sinX = Math.sin(rotX);
-      const cosY = Math.cos(rotY);
-      const sinY = Math.sin(rotY);
-
-      const projected = vertices.map(([vx, vy, vz]) => {
-        // Rot Y
-        const x1 = vx * cosY - vz * sinY;
-        const z1 = vx * sinY + vz * cosY;
-        // Rot X
-        const y2 = vy * cosX - z1 * sinX;
-        const z2 = vy * sinX + z1 * cosX;
-
-        // Perspective projection
-        const fov = 350;
-        const scale = fov / (fov + z2 + 100);
-        return {
-          x: centerX + x1 * scale,
-          y: centerY + y2 * scale,
-          z: z2,
-        };
-      });
-
-      // 6 faces
-      const faces = [
-        [0, 1, 2, 3], // back
-        [4, 5, 6, 7], // front
-        [0, 1, 5, 4], // top
-        [2, 3, 7, 6], // bottom
-        [0, 3, 7, 4], // left
-        [1, 2, 6, 5], // right
-      ];
-
-      ctx.save();
-      ctx.shadowColor = glow;
-      ctx.shadowBlur = 16;
-
-      // Draw faces with subtle translucent glass fill
-      faces.forEach((face) => {
-        ctx.beginPath();
-        ctx.moveTo(projected[face[0]].x, projected[face[0]].y);
-        for (let i = 1; i < face.length; i++) {
-          ctx.lineTo(projected[face[i]].x, projected[face[i]].y);
-        }
-        ctx.closePath();
-        ctx.fillStyle = color + '22';
-        ctx.fill();
-        ctx.strokeStyle = color + 'dd';
-        ctx.lineWidth = 1.4;
-        ctx.stroke();
-      });
-
-      // Glowing corner dots
-      projected.forEach((p) => {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 1.8, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-      });
-
-      ctx.restore();
-    };
 
     const render = () => {
       time += 0.016;
 
-      // Smooth mouse follow
+      // Smooth mouse parallax
       mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.05;
       mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.05;
 
-      const cx = width / 2 + mouseRef.current.x;
-      const cy = height * 0.42 + mouseRef.current.y;
+      const themeColors = getThemeColors();
 
-      // Deep Obsidian background clear
-      ctx.clearRect(0, 0, width, height);
+      // Deep Obsidian base background
+      ctx.fillStyle = '#0B0D12';
+      ctx.fillRect(0, 0, width, height);
 
-      const pal = palettes[riskLevel] || palettes.LOW;
-      const listeningBoost = isListening ? 1.4 : 1.0;
-      const soundBoost = 1.0 + (audioLevel || 0) * 0.8;
+      // Radial background depth gradient
+      const bgRadial = ctx.createRadialGradient(
+        width / 2 + mouseRef.current.x * 0.5,
+        height / 2 + mouseRef.current.y * 0.5,
+        20,
+        width / 2,
+        height / 2,
+        Math.max(width, height) * 0.8
+      );
+      bgRadial.addColorStop(0, '#141824');
+      bgRadial.addColorStop(0.5, '#0E1119');
+      bgRadial.addColorStop(1, '#0B0D12');
+      ctx.fillStyle = bgRadial;
+      ctx.fillRect(0, 0, width, height);
 
-      // 1. Draw Stardust
+      // Render Stars
       stars.forEach((star) => {
-        const pulse = Math.sin(time * star.pulseSpeed * 10) * 0.3 + 0.7;
+        const twinkle = Math.sin(time * star.twinkleSpeed * 60 + star.twinklePhase);
+        const alpha = Math.max(0.08, star.baseAlpha + twinkle * 0.25);
+        ctx.fillStyle = `rgba(241, 243, 248, ${alpha})`;
         ctx.beginPath();
-        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(220, 205, 255, ${star.alpha * pulse})`;
+        const px = star.x + mouseRef.current.x * 0.15;
+        const py = star.y + mouseRef.current.y * 0.15;
+        ctx.arc(px, py, star.size, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // 2. Central Candlelight Core + Obsidian Glow
-      const candleFlicker = Math.sin(time * 6) * 0.08 + Math.cos(time * 11) * 0.04 + 1;
-      const coreRadius = (80 + Math.sin(time * 2) * 12) * listeningBoost * soundBoost * candleFlicker;
+      // Solar System Center
+      const centerX = width / 2 + mouseRef.current.x;
+      const centerY = height / 2 + mouseRef.current.y;
 
-      // Wide ambient purple obsidian radial glow
-      const ambientGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreRadius * 4.2);
-      ambientGrad.addColorStop(0, pal.coreGlow);
-      ambientGrad.addColorStop(0.35, pal.ambientGlow);
-      ambientGrad.addColorStop(0.75, 'rgba(13, 6, 25, 0.4)');
-      ambientGrad.addColorStop(1, 'transparent');
-      ctx.fillStyle = ambientGrad;
-      ctx.fillRect(0, 0, width, height);
+      // Audio reactivity pulse
+      const audioPulse = isListening ? audioLevel * 18 : 0;
+      const breath = Math.sin(time * 1.5) * 2;
+      const baseSunRadius = 24 + breath + audioPulse;
 
-      // Inner candlelight flame core
-      const flameGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreRadius * 0.85);
-      flameGrad.addColorStop(0, pal.flameCore);
-      flameGrad.addColorStop(0.4, pal.coreGlow);
-      flameGrad.addColorStop(1, 'transparent');
-      ctx.save();
-      ctx.shadowColor = pal.flameCore;
-      ctx.shadowBlur = 35;
-      ctx.beginPath();
-      ctx.arc(cx, cy, coreRadius * 0.4, 0, Math.PI * 2);
-      ctx.fillStyle = flameGrad;
-      ctx.fill();
-      ctx.restore();
-
-      // 3. Draw Elliptical Orbit Rings
-      cubes.forEach((cube) => {
+      // 1. Draw Planetary Orbit Paths
+      planets.forEach((p) => {
         ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(cube.tiltAngle);
+        ctx.translate(centerX, centerY);
+        ctx.rotate(p.tilt);
+
         ctx.beginPath();
-        ctx.ellipse(0, 0, cube.orbitRadiusX, cube.orbitRadiusY, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = pal.ringStroke;
+        ctx.ellipse(0, 0, p.orbitA, p.orbitB, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = themeColors.orbitStroke;
         ctx.lineWidth = 1;
-        ctx.setLineDash([4, 6]);
+        ctx.setLineDash([3, 7]);
         ctx.stroke();
         ctx.setLineDash([]);
+
         ctx.restore();
       });
 
-      // 4. Update & Draw Orbiting 3D Cubes (Astra style)
-      // Sort cubes by Z (pseudo depth) so foreground renders over background
-      const cubesToDraw = cubes.map((cube) => {
-        // Accelerate when listening or sound detected
-        const currentSpeed = cube.speed * listeningBoost * (1 + audioLevel * 1.5);
-        cube.currentAngle += currentSpeed;
-        cube.rotationX += cube.rotSpeedX;
-        cube.rotationY += cube.rotSpeedY;
+      // 2. Draw Central Star Glow & Corona
+      const sunGlow = ctx.createRadialGradient(
+        centerX,
+        centerY,
+        baseSunRadius * 0.2,
+        centerX,
+        centerY,
+        baseSunRadius * 4.5
+      );
+      sunGlow.addColorStop(0, themeColors.sunCore);
+      sunGlow.addColorStop(0.25, themeColors.sunInner);
+      sunGlow.addColorStop(0.6, themeColors.sunOuter);
+      sunGlow.addColorStop(1, 'rgba(11, 13, 18, 0)');
 
-        // Position on tilted ellipse
-        const cosAngle = Math.cos(cube.currentAngle);
-        const sinAngle = Math.sin(cube.currentAngle);
+      ctx.fillStyle = sunGlow;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, baseSunRadius * 4.5, 0, Math.PI * 2);
+      ctx.fill();
 
-        const rawX = cosAngle * cube.orbitRadiusX;
-        const rawY = sinAngle * cube.orbitRadiusY;
+      // Core Star Sphere
+      ctx.fillStyle = themeColors.sunCore;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, baseSunRadius * 0.7, 0, Math.PI * 2);
+      ctx.shadowColor = themeColors.accent;
+      ctx.shadowBlur = 25 + audioPulse * 1.5;
+      ctx.fill();
+      ctx.shadowBlur = 0;
 
-        // Apply tilt rotation matrix
-        const cosTilt = Math.cos(cube.tiltAngle);
-        const sinTilt = Math.sin(cube.tiltAngle);
+      // 3. Update & Draw Planets
+      planets.forEach((p) => {
+        p.angle += p.speed;
 
-        const rotatedX = rawX * cosTilt - rawY * sinTilt;
-        const rotatedY = rawX * sinTilt + rawY * cosTilt;
+        // Position on inclined ellipse
+        const rawX = Math.cos(p.angle) * p.orbitA;
+        const rawY = Math.sin(p.angle) * p.orbitB;
 
-        const posX = cx + rotatedX;
-        const posY = cy + rotatedY;
-        const depthZ = sinAngle; // -1 back, +1 front
+        // Apply tilt rotation
+        const cosT = Math.cos(p.tilt);
+        const sinT = Math.sin(p.tilt);
+        const planetX = centerX + (rawX * cosT - rawY * sinT);
+        const planetY = centerY + (rawX * sinT + rawY * cosT);
 
-        // Add to trail
-        cube.trail.unshift({ x: posX, y: posY, alpha: 0.6 });
-        if (cube.trail.length > 14) cube.trail.pop();
+        // Record orbital trail
+        p.trail.unshift({ x: planetX, y: planetY, alpha: 0.4 });
+        if (p.trail.length > 20) p.trail.pop();
 
-        return { cube, posX, posY, depthZ };
-      });
-
-      // Sort back-to-front
-      cubesToDraw.sort((a, b) => a.depthZ - b.depthZ);
-
-      cubesToDraw.forEach(({ cube, posX, posY, depthZ }) => {
-        // Draw trailing particles
-        for (let i = 1; i < cube.trail.length; i++) {
-          const pt = cube.trail[i];
-          const fadeAlpha = ((cube.trail.length - i) / cube.trail.length) * 0.35;
+        // Draw Trail
+        for (let i = 0; i < p.trail.length - 1; i++) {
+          const pt = p.trail[i];
+          const fade = (1 - i / p.trail.length) * 0.35;
+          ctx.fillStyle = p.glowColor.replace(/[\d.]+\)$/, `${fade})`);
           ctx.beginPath();
-          ctx.arc(pt.x, pt.y, (cube.size * 0.2 * (cube.trail.length - i)) / cube.trail.length, 0, Math.PI * 2);
-          ctx.fillStyle = cube.glowColor.replace('0.7', String(fadeAlpha));
+          ctx.arc(pt.x, pt.y, Math.max(1, p.radius * (1 - i / p.trail.length)), 0, Math.PI * 2);
           ctx.fill();
         }
 
-        // Draw connection beam to core
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(posX, posY);
-        ctx.strokeStyle = cube.glowColor.replace(/[\d.]+\)$/, '0.12)');
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-
-        // Dynamic size scaling with 3D depth
-        const scaleFactor = 0.75 + (depthZ + 1) * 0.3;
-        const activeSize = cube.size * scaleFactor * (isListening ? 1.15 : 1.0);
-
-        draw3DCube(
-          posX,
-          posY,
-          activeSize,
-          cube.rotationX,
-          cube.rotationY,
-          cube.color,
-          cube.glowColor
+        // Draw Planet Body
+        const planetGrad = ctx.createRadialGradient(
+          planetX - p.radius * 0.3,
+          planetY - p.radius * 0.3,
+          p.radius * 0.1,
+          planetX,
+          planetY,
+          p.radius
         );
+        planetGrad.addColorStop(0, '#FFFFFF');
+        planetGrad.addColorStop(0.35, p.color);
+        planetGrad.addColorStop(1, '#0B0D12');
+
+        ctx.fillStyle = planetGrad;
+        ctx.beginPath();
+        ctx.arc(planetX, planetY, p.radius, 0, Math.PI * 2);
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Optional Rings (e.g. Violet Gas Giant)
+        if (p.hasRings && p.ringRadius) {
+          ctx.save();
+          ctx.translate(planetX, planetY);
+          ctx.rotate(p.ringTilt || -0.2);
+
+          ctx.beginPath();
+          ctx.ellipse(0, 0, p.ringRadius, p.ringRadius * 0.32, 0, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(139, 124, 255, 0.45)';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.ellipse(0, 0, p.ringRadius * 1.25, p.ringRadius * 0.38, 0, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(114, 215, 232, 0.25)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        // Optional Moon (e.g. Terrestrial Cyan World)
+        if (p.hasMoon && p.moonDist) {
+          p.moonAngle = (p.moonAngle || 0) + 0.04;
+          const moonX = planetX + Math.cos(p.moonAngle) * p.moonDist;
+          const moonY = planetY + Math.sin(p.moonAngle) * (p.moonDist * 0.45);
+
+          ctx.fillStyle = '#E2E8F0';
+          ctx.beginPath();
+          ctx.arc(moonX, moonY, 1.8, 0, Math.PI * 2);
+          ctx.shadowColor = '#72D7E8';
+          ctx.shadowBlur = 4;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
       });
 
       animFrameRef.current = requestAnimationFrame(render);
@@ -422,17 +383,19 @@ export default function AstraOrbitalCanvas({
     render();
 
     return () => {
-      cancelAnimationFrame(animFrameRef.current);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
   }, [riskLevel, isListening, audioLevel]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none select-none"
-      style={{ zIndex: 0 }}
+      className="fixed inset-0 w-full h-full pointer-events-none z-0"
+      style={{
+        background: '#0B0D12',
+      }}
     />
   );
 }

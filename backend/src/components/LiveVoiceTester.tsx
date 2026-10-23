@@ -151,6 +151,24 @@ export default function LiveVoiceTester({
           const update = await res.json();
           const assessment: RiskAssessment = update.assessment;
           if (assessment) {
+            // Concurrently query RAG semantic retrieval endpoint
+            try {
+              const ragRes = await fetch('/rag/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  text: text.trim(),
+                  top_k: 3,
+                  include_retrieved_examples: true,
+                }),
+              });
+              if (ragRes.ok) {
+                assessment.rag_classification = await ragRes.json();
+              }
+            } catch (ragErr) {
+              console.debug('RAG query skipped:', ragErr);
+            }
+
             onAssessmentUpdate(assessment);
 
             const keywords = (assessment.rule_analysis?.triggered_indicators || []).map(
@@ -563,15 +581,15 @@ export default function LiveVoiceTester({
   };
 
   return (
-    <div className="glass-card p-6 md:p-8 space-y-6">
+    <div className="glass-card p-6 md:p-8 space-y-6 border border-[#292F3C]">
       {/* Top Banner, Audio Mode & Language Selector */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[#292F3C]">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-            <h2 className="text-lg font-bold gradient-text">Live Call & Voice Shield</h2>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#63D6A5] animate-ping" />
+            <h2 className="text-lg font-bold text-[#F1F3F8]">Live Call & Voice Shield</h2>
           </div>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs text-[#A2A9BA] mt-0.5">
             Real-Time Speech Ingestion, Telegram Monitoring & Immediate Scam Keyword Flagging
           </p>
         </div>
@@ -580,12 +598,12 @@ export default function LiveVoiceTester({
         <div className="flex flex-wrap items-center gap-2">
           {/* Audio Source Mode */}
           <div className="flex items-center gap-1.5">
-            <Headphones className="w-4 h-4 text-[var(--purple-candle)]" />
+            <Headphones className="w-4 h-4 text-[#8B7CFF]" />
             <select
               value={captureMode}
               onChange={(e) => setCaptureMode(e.target.value as 'mic' | 'dual')}
               disabled={isRecording}
-              className="glass px-3 py-1.5 rounded-xl text-xs font-mono bg-black/40 text-white border-white/15 focus:outline-none focus:border-[var(--purple-bright)]"
+              className="glass px-3 py-1.5 rounded-xl text-xs font-mono bg-[#11141C] text-[#F1F3F8] border-[#292F3C] focus:outline-none focus:border-[#8B7CFF]"
               title="Select audio source: Mic only (speakers) or Dual (captures Telegram call audio directly)"
             >
               <option value="mic">🎙️ Mic Only (Speakers / Laptop)</option>
@@ -595,12 +613,12 @@ export default function LiveVoiceTester({
 
           {/* Language selector */}
           <div className="flex items-center gap-1.5">
-            <Globe className="w-4 h-4 text-[var(--purple-candle)]" />
+            <Globe className="w-4 h-4 text-[#72D7E8]" />
             <select
               value={languageCode}
               onChange={(e) => setLanguageCode(e.target.value)}
               disabled={isRecording}
-              className="glass px-3 py-1.5 rounded-xl text-xs font-mono bg-black/40 text-white border-white/15 focus:outline-none focus:border-[var(--purple-bright)]"
+              className="glass px-3 py-1.5 rounded-xl text-xs font-mono bg-[#11141C] text-[#F1F3F8] border-[#292F3C] focus:outline-none focus:border-[#8B7CFF]"
             >
               <option value="auto">🌐 Auto Detect (Hi/En/Pa)</option>
               <option value="hi-IN">🇮🇳 Hindi (हिन्दी)</option>
@@ -612,10 +630,10 @@ export default function LiveVoiceTester({
       </div>
 
       {captureMode === 'dual' && !isRecording && (
-        <div className="glass px-4 py-2.5 rounded-xl border-purple-500/20 bg-purple-950/25 text-xs text-purple-200 flex items-center gap-2">
-          <Headphones className="w-4 h-4 text-purple-400 flex-shrink-0" />
+        <div className="px-4 py-2.5 rounded-xl border border-[#292F3C] bg-[#11141C] text-xs text-[#A2A9BA] flex items-center gap-2">
+          <Headphones className="w-4 h-4 text-[#8B7CFF] shrink-0" />
           <span>
-            <strong>Dual Mode Active:</strong> When you click Talk, your browser will prompt to share audio. Select your <strong>Telegram Window / Screen</strong> and ensure <strong>"Also share system audio"</strong> is checked so your caller's voice is captured through headphones.
+            <strong className="text-[#F1F3F8]">Dual Mode Active:</strong> When you click Talk, your browser will prompt to share audio. Select your <strong>Telegram Window / Screen</strong> and ensure <strong>"Also share system audio"</strong> is checked so your caller's voice is captured through headphones.
           </span>
         </div>
       )}
@@ -627,11 +645,11 @@ export default function LiveVoiceTester({
           {isRecording && (
             <>
               <div
-                className="absolute inset-0 rounded-full border-2 border-emerald-400/40 animate-ping"
+                className="absolute inset-0 rounded-full border-2 border-[#63D6A5]/40 animate-ping"
                 style={{ transform: `scale(${1 + audioLevel * 1.5})` }}
               />
               <div
-                className="absolute -inset-4 rounded-full border border-purple-400/20 animate-pulse"
+                className="absolute -inset-4 rounded-full border border-[#8B7CFF]/25 animate-pulse"
                 style={{ transform: `scale(${1 + audioLevel * 1.8})` }}
               />
             </>
@@ -646,8 +664,8 @@ export default function LiveVoiceTester({
               transition-all duration-300 transform hover:scale-105 active:scale-95 cursor-pointer
               ${
                 isRecording
-                  ? 'bg-gradient-to-tr from-red-600 via-rose-600 to-red-500 text-white shadow-[0_0_50px_rgba(239,68,68,0.5)] animate-pulse'
-                  : 'bg-gradient-to-tr from-[var(--purple-dim)] via-[var(--purple-glow)] to-[var(--green-accent)] text-white shadow-[0_0_40px_rgba(168,85,247,0.35)]'
+                  ? 'bg-gradient-to-tr from-rose-600 via-red-600 to-rose-500 text-white shadow-[0_0_50px_rgba(240,128,145,0.5)] animate-pulse'
+                  : 'bg-gradient-to-tr from-[#8B7CFF] via-[#7280FF] to-[#72D7E8] text-white shadow-[0_0_35px_rgba(139,124,255,0.35)]'
               }
             `}
             title={isRecording ? 'Click to Stop and Analyze' : 'Click to Speak'}
@@ -660,18 +678,18 @@ export default function LiveVoiceTester({
         </div>
 
         <div>
-          <h3 className="text-xl font-bold text-white">
+          <h3 className="text-xl font-bold text-[#F1F3F8]">
             {isRecording
               ? 'Listening to Speech... Click when done'
               : isTranscribing
               ? 'Transcribing & Evaluating Risk...'
               : 'Tap Mic to Speak & Check Keywords'}
           </h3>
-          <p className="text-xs text-[var(--text-muted)] mt-1 max-w-md mx-auto">{statusText}</p>
+          <p className="text-xs text-[#A2A9BA] mt-1 max-w-md mx-auto">{statusText}</p>
         </div>
 
         {/* Live Audio Level Waveform Bar */}
-        <div className="w-full max-w-xs flex items-center gap-1.5 h-6 px-4 glass rounded-full justify-center">
+        <div className="w-full max-w-xs flex items-center gap-1.5 h-6 px-4 bg-[#11141C] border border-[#292F3C] rounded-full justify-center">
           {[...Array(24)].map((_, i) => {
             const h = Math.max(3, Math.sin(i * 0.4 + audioLevel * 10) * audioLevel * 20);
             return (
@@ -682,10 +700,10 @@ export default function LiveVoiceTester({
                   height: `${isRecording ? h : 3}px`,
                   background:
                     activeRisk?.risk_level === 'HIGH' || activeRisk?.risk_level === 'CRITICAL'
-                      ? '#ef4444'
+                      ? '#F08091'
                       : isRecording
-                      ? '#34d399'
-                      : 'rgba(255,255,255,0.2)',
+                      ? '#63D6A5'
+                      : 'rgba(241, 243, 248, 0.2)',
                 }}
               />
             );
@@ -694,8 +712,8 @@ export default function LiveVoiceTester({
 
         {/* Live speech interim preview while speaking */}
         {isRecording && liveTranscriptPreview && (
-          <div className="w-full max-w-lg p-3 rounded-xl glass border-purple-500/30 bg-purple-950/20 text-xs text-white/90 animate-slide-up">
-            <span className="text-[10px] font-mono text-[var(--purple-candle)] block mb-1">
+          <div className="w-full max-w-lg p-3 rounded-xl bg-[#11141C] border border-[#8B7CFF]/30 text-xs text-[#F1F3F8] animate-slide-up">
+            <span className="text-[10px] font-mono text-[#8B7CFF] block mb-1">
               🎙️ Live Speech Interim Preview:
             </span>
             <p className="italic">{liveTranscriptPreview}</p>
@@ -705,14 +723,14 @@ export default function LiveVoiceTester({
 
       {/* Error alert if any */}
       {errorMsg && (
-        <div className="glass p-4 rounded-xl border-red-500/30 bg-red-950/20 text-red-300 text-xs flex items-center justify-between gap-2">
+        <div className="p-4 rounded-xl border border-[#F08091]/30 bg-[#11141C] text-[#F08091] text-xs flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <AlertOctagon className="w-4 h-4 flex-shrink-0 text-red-400" />
+            <AlertOctagon className="w-4 h-4 shrink-0 text-[#F08091]" />
             <span>{errorMsg}</span>
           </div>
           <button
             onClick={() => setErrorMsg(null)}
-            className="text-[11px] underline text-red-300 hover:text-white"
+            className="text-[11px] underline text-[#F08091] hover:text-white"
           >
             Dismiss
           </button>
@@ -720,13 +738,13 @@ export default function LiveVoiceTester({
       )}
 
       {/* Quick Speech Simulator Presets */}
-      <div className="glass p-4 rounded-2xl border-white/10 space-y-3">
+      <div className="p-4 rounded-2xl bg-[#11141C] border border-[#292F3C] space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            One-Click Voice Test Phrases (Immediate Keyword Flagging)
+          <span className="text-xs font-semibold text-[#A2A9BA] flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-[#F2C879]" />
+            <span>One-Click Voice Test Phrases (Immediate Keyword Flagging)</span>
           </span>
-          <span className="text-[10px] text-[var(--text-muted)] font-mono">Instant Test</span>
+          <span className="text-[10px] text-[#70798C] font-mono">Instant Test</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -734,55 +752,55 @@ export default function LiveVoiceTester({
             onClick={() =>
               evaluateTranscript('Sir, please share your 6 digit OTP right now to verify account.', 'preset')
             }
-            className="p-2.5 rounded-xl glass hover:bg-white/10 text-left border-red-500/20 hover:border-red-500/40 text-red-200 transition-all flex items-center justify-between"
+            className="p-2.5 rounded-xl bg-[#171B26] hover:bg-[#202636] text-left border border-[#292F3C] hover:border-[#F08091]/50 text-[#F1F3F8] transition-all flex items-center justify-between"
           >
             <span className="line-clamp-1">🚨 "Sir, please share your 6-digit OTP right now"</span>
-            <Play className="w-3 h-3 flex-shrink-0 text-red-400 fill-current ml-2" />
+            <Play className="w-3 h-3 shrink-0 text-[#F08091] fill-current ml-2" />
           </button>
 
           <button
             onClick={() =>
               evaluateTranscript('Your bank account is blocked, give me your UPI PIN immediately.', 'preset')
             }
-            className="p-2.5 rounded-xl glass hover:bg-white/10 text-left border-red-500/20 hover:border-red-500/40 text-red-200 transition-all flex items-center justify-between"
+            className="p-2.5 rounded-xl bg-[#171B26] hover:bg-[#202636] text-left border border-[#292F3C] hover:border-[#F08091]/50 text-[#F1F3F8] transition-all flex items-center justify-between"
           >
             <span className="line-clamp-1">🚨 "Account is blocked, give me your UPI PIN"</span>
-            <Play className="w-3 h-3 flex-shrink-0 text-red-400 fill-current ml-2" />
+            <Play className="w-3 h-3 shrink-0 text-[#F08091] fill-current ml-2" />
           </button>
 
           <button
             onClick={() =>
               evaluateTranscript('You are under digital arrest by CBI Mumbai. Non-bailable warrant issued.', 'preset')
             }
-            className="p-2.5 rounded-xl glass hover:bg-white/10 text-left border-rose-500/20 hover:border-rose-500/40 text-rose-200 transition-all flex items-center justify-between"
+            className="p-2.5 rounded-xl bg-[#171B26] hover:bg-[#202636] text-left border border-[#292F3C] hover:border-[#F08091]/50 text-[#F1F3F8] transition-all flex items-center justify-between"
           >
             <span className="line-clamp-1">🚨 "Digital arrest by CBI, arrest warrant issued"</span>
-            <Play className="w-3 h-3 flex-shrink-0 text-rose-400 fill-current ml-2" />
+            <Play className="w-3 h-3 shrink-0 text-[#F08091] fill-current ml-2" />
           </button>
 
           <button
             onClick={() =>
               evaluateTranscript('Hello, I want to check my account balance and get a mini statement.', 'preset')
             }
-            className="p-2.5 rounded-xl glass hover:bg-white/10 text-left border-emerald-500/20 hover:border-emerald-500/40 text-emerald-200 transition-all flex items-center justify-between"
+            className="p-2.5 rounded-xl bg-[#171B26] hover:bg-[#202636] text-left border border-[#292F3C] hover:border-[#63D6A5]/50 text-[#F1F3F8] transition-all flex items-center justify-between"
           >
             <span className="line-clamp-1">✅ "Hello, I want to check my account balance" (Safe)</span>
-            <Play className="w-3 h-3 flex-shrink-0 text-emerald-400 fill-current ml-2" />
+            <Play className="w-3 h-3 shrink-0 text-[#63D6A5] fill-current ml-2" />
           </button>
         </div>
       </div>
 
-      {/* Telegram VoIP Voice Call Bridge Card (ashboi005/onfloor) */}
-      <div className="glass p-4 rounded-2xl border-purple-500/30 bg-purple-950/15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      {/* Telegram VoIP Voice Call Bridge Card */}
+      <div className="p-4 rounded-2xl border border-[#292F3C] bg-[#11141C] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <PhoneCall className="w-4 h-4 text-[var(--purple-bright)]" />
-            <span className="text-xs font-semibold text-white">Telegram VoIP Call Bridge (onfloor)</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <PhoneCall className="w-4 h-4 text-[#8B7CFF]" />
+            <span className="text-xs font-semibold text-[#F1F3F8]">Telegram VoIP Call Bridge</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#63D6A5]/15 text-[#63D6A5] border border-[#63D6A5]/30">
               WS: /internal/live/ingest
             </span>
           </div>
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-[11px] text-[#A2A9BA]">
             Connects live Telegram VoIP phone calls from <code>py-tgcalls</code> directly into the scam detection engine.
           </p>
         </div>
@@ -790,9 +808,9 @@ export default function LiveVoiceTester({
         <button
           onClick={handleTestTelegramBridge}
           disabled={isSimulatingTelegram}
-          className="px-3.5 py-1.5 rounded-xl glass hover:bg-white/10 text-xs font-medium text-[var(--purple-candle)] border border-[var(--purple-border)] flex items-center gap-1.5 transition-all flex-shrink-0"
+          className="btn-secondary px-3.5 py-1.5 text-xs font-medium text-[#8B7CFF] border-[#292F3C] flex items-center gap-1.5 shrink-0"
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <Sparkles className="w-3.5 h-3.5 text-[#F2C879]" />
           <span>{isSimulatingTelegram ? 'Testing...' : 'Test Telegram Bridge Call'}</span>
         </button>
       </div>
@@ -800,28 +818,28 @@ export default function LiveVoiceTester({
       {/* Temporarily Stored Speech & Keyword Detection History */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-2">
-            <Clock className="w-3.5 h-3.5 text-[var(--green-accent)]" />
-            Temporarily Stored Speech & Flagged Keywords ({storedUtterances.length})
+          <span className="text-xs font-semibold text-[#A2A9BA] flex items-center gap-2">
+            <Clock className="w-3.5 h-3.5 text-[#63D6A5]" />
+            <span>Temporarily Stored Speech & Flagged Keywords ({storedUtterances.length})</span>
           </span>
 
           {storedUtterances.length > 0 && (
             <button
               onClick={() => setStoredUtterances([])}
-              className="text-[11px] text-[var(--text-muted)] hover:text-white flex items-center gap-1 hover:underline"
+              className="text-[11px] text-[#70798C] hover:text-[#F1F3F8] flex items-center gap-1 hover:underline"
             >
               <Trash2 className="w-3 h-3" />
-              Clear Temporary Storage
+              <span>Clear Temporary Storage</span>
             </button>
           )}
         </div>
 
         {storedUtterances.length === 0 ? (
-          <div className="glass p-8 rounded-2xl text-center text-xs text-[var(--text-muted)] italic">
+          <div className="p-8 rounded-2xl bg-[#11141C] border border-[#292F3C] text-center text-xs text-[#70798C] italic">
             No speech has been recorded yet. Click the mic button above, say a phrase (e.g. "tell me your OTP"), and your spoken words will appear here with highlighted keywords!
           </div>
         ) : (
-          <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+          <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
             {storedUtterances.map((utt) => {
               const isDanger = utt.riskLevel === 'HIGH' || utt.riskLevel === 'CRITICAL';
               const isCaution = utt.riskLevel === 'MEDIUM';
@@ -829,20 +847,20 @@ export default function LiveVoiceTester({
               return (
                 <div
                   key={utt.id}
-                  className={`p-4 rounded-2xl glass border transition-all animate-slide-up ${
+                  className={`p-3.5 rounded-2xl border transition-all animate-slide-up ${
                     isDanger
-                      ? 'border-red-500/40 bg-red-950/20 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
+                      ? 'border-[#F08091]/40 bg-[#11141C]'
                       : isCaution
-                      ? 'border-amber-500/40 bg-amber-950/20'
-                      : 'border-white/10 bg-white/[0.02]'
+                      ? 'border-[#F2C879]/40 bg-[#11141C]'
+                      : 'border-[#292F3C] bg-[#11141C]'
                   }`}
                 >
-                  <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-2 font-mono">
+                  <div className="flex items-center justify-between text-[11px] text-[#70798C] mb-2 font-mono">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--green-accent)]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#63D6A5]" />
                       <span>{new Date(utt.timestamp).toLocaleTimeString()}</span>
-                      <span className="text-white/40">·</span>
-                      <span className={`uppercase text-[10px] font-semibold ${utt.speaker === 'agent' ? 'text-emerald-400' : 'text-purple-300'}`}>
+                      <span className="text-[#292F3C]">·</span>
+                      <span className={`uppercase text-[10px] font-semibold ${utt.speaker === 'agent' ? 'text-[#63D6A5]' : 'text-[#8B7CFF]'}`}>
                         {utt.speaker ? `${utt.speaker.toUpperCase()} · ` : ''}{utt.source.replace('_', ' ')}
                       </span>
                     </span>
@@ -850,12 +868,12 @@ export default function LiveVoiceTester({
                     <span
                       className={`px-2 py-0.5 rounded-full font-bold text-[10px] border ${
                         utt.riskLevel === 'CRITICAL'
-                          ? 'bg-rose-500/30 text-rose-300 border-rose-500/50'
+                          ? 'bg-[#F08091]/20 text-[#F08091] border-[#F08091]/40'
                           : isDanger
-                          ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                          ? 'bg-[#F08091]/15 text-[#F08091] border-[#F08091]/30'
                           : isCaution
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          ? 'bg-[#F2C879]/15 text-[#F2C879] border-[#F2C879]/30'
+                          : 'bg-[#63D6A5]/15 text-[#63D6A5] border-[#63D6A5]/30'
                       }`}
                     >
                       {utt.riskLevel} ({Math.round(utt.riskScore)}/100)
@@ -863,21 +881,21 @@ export default function LiveVoiceTester({
                   </div>
 
                   {/* Spoken Text with Keyword Highlighting */}
-                  <p className="text-sm font-medium text-white leading-relaxed mb-2">
+                  <p className="text-xs font-medium text-[#F1F3F8] leading-relaxed mb-2">
                     {renderHighlightedText(utt.text, utt.flaggedKeywords)}
                   </p>
 
                   {/* Flagged Keywords Pills */}
                   {utt.flaggedKeywords && utt.flaggedKeywords.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap mt-2 pt-2 border-t border-white/5">
-                      <span className="text-[10px] font-mono text-red-400 font-semibold flex items-center gap-1">
-                        <Flame className="w-3 h-3 text-red-400" />
+                    <div className="flex items-center gap-1.5 flex-wrap mt-2 pt-2 border-t border-[#292F3C]">
+                      <span className="text-[10px] font-mono text-[#F08091] font-semibold flex items-center gap-1">
+                        <Flame className="w-3 h-3 text-[#F08091]" />
                         Flagged Threats:
                       </span>
                       {utt.flaggedKeywords.map((kw, i) => (
                         <span
                           key={i}
-                          className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40"
+                          className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#F08091]/15 text-[#F08091] border border-[#F08091]/30"
                         >
                           {kw}
                         </span>
@@ -887,8 +905,8 @@ export default function LiveVoiceTester({
 
                   {/* Recommended Action */}
                   {utt.safeAction && isDanger && (
-                    <div className="mt-2 text-xs text-amber-300 bg-black/40 p-2 rounded-xl flex items-center gap-2">
-                      <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <div className="mt-2 text-xs text-[#F2C879] bg-[#171B26] p-2 rounded-xl border border-[#292F3C] flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 text-[#F2C879] shrink-0" />
                       <span>{utt.safeAction}</span>
                     </div>
                   )}

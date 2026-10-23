@@ -25,7 +25,7 @@ import LiveVoiceTester from './components/LiveVoiceTester';
 import ThreatIntelPanel from './components/ThreatIntelPanel';
 import StatusBar from './components/StatusBar';
 import { audioAlerts } from './utils/audioAlerts';
-import type { RiskAssessment, TranscriptSegment } from './hooks/useLiveDetection';
+import type { RiskAssessment, TranscriptSegment, RAGClassificationResponse } from './hooks/useLiveDetection';
 
 type ActiveTab = 'mic' | 'phone' | 'text' | 'intel';
 
@@ -51,7 +51,7 @@ export default function App() {
     localStorage.setItem('suraksha_tutorial_seen', 'true');
   }, []);
 
-  // Text analysis handler
+  // Text analysis handler with concurrent RAG vector search
   const handleAnalyzeText = async (text: string): Promise<void> => {
     if (!text.trim()) return;
     setIsProcessingText(true);
@@ -65,18 +65,41 @@ export default function App() {
       };
       setTranscriptHistory((prev) => [...prev, newSeg]);
 
-      const res = await fetch('/analyze/transcript', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: text,
-          language_code: 'auto',
-          transcript_confidence: 0.98,
+      // Execute both transcript heuristics and RAG vector store search concurrently
+      const [res, ragRes] = await Promise.allSettled([
+        fetch('/analyze/transcript', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: text,
+            language_code: 'auto',
+            transcript_confidence: 0.98,
+          }),
         }),
-      });
+        fetch('/rag/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            top_k: 3,
+            include_retrieved_examples: true,
+          }),
+        }),
+      ]);
 
-      if (res.ok) {
-        const assessment: RiskAssessment = await res.json();
+      if (res.status === 'fulfilled' && res.value.ok) {
+        const assessment: RiskAssessment = await res.value.json();
+
+        // Attach RAG vector classification and nearest neighbors if available
+        if (ragRes.status === 'fulfilled' && ragRes.value.ok) {
+          try {
+            const ragData: RAGClassificationResponse = await ragRes.value.json();
+            assessment.rag_classification = ragData;
+          } catch (err) {
+            console.warn('RAG parse warning in text analyzer:', err);
+          }
+        }
+
         setActiveRisk(assessment);
 
         if (assessment.risk_level === 'HIGH' || assessment.risk_level === 'CRITICAL') {
@@ -94,21 +117,42 @@ export default function App() {
     }
   };
 
-  // Segment analysis for Phone Simulator
+  // Segment analysis for Phone Simulator with concurrent RAG vector search
   const handleAnalyzeSegment = async (text: string): Promise<RiskAssessment | null> => {
     try {
-      const res = await fetch('/analyze/transcript', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: text,
-          language_code: 'auto',
-          transcript_confidence: 0.95,
+      const [res, ragRes] = await Promise.allSettled([
+        fetch('/analyze/transcript', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: text,
+            language_code: 'auto',
+            transcript_confidence: 0.95,
+          }),
         }),
-      });
+        fetch('/rag/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            top_k: 3,
+            include_retrieved_examples: true,
+          }),
+        }),
+      ]);
 
-      if (res.ok) {
-        const assessment: RiskAssessment = await res.json();
+      if (res.status === 'fulfilled' && res.value.ok) {
+        const assessment: RiskAssessment = await res.value.json();
+
+        if (ragRes.status === 'fulfilled' && ragRes.value.ok) {
+          try {
+            const ragData: RAGClassificationResponse = await ragRes.value.json();
+            assessment.rag_classification = ragData;
+          } catch (err) {
+            console.warn('RAG parse warning in segment analyzer:', err);
+          }
+        }
+
         setActiveRisk(assessment);
         setTranscriptHistory((prev) => [
           ...prev,
@@ -130,8 +174,8 @@ export default function App() {
   const riskLevel = activeRisk?.risk_level || 'LOW';
 
   return (
-    <div className="min-h-screen relative flex flex-col font-sans selection:bg-purple-500/30 selection:text-white">
-      {/* 3D Astra Orbital Canvas with Candlelight Obsidian + Green Shade */}
+    <div className="min-h-screen relative flex flex-col font-sans selection:bg-[#8B7CFF]/30 selection:text-white bg-[#0B0D12] text-[#E8ECF2]">
+      {/* 3D Astra Orbital Canvas with Obsidian Cosmic palette & solar system */}
       <AstraOrbitalCanvas
         riskLevel={riskLevel}
         isListening={activeTab === 'mic'}
@@ -144,17 +188,17 @@ export default function App() {
       {/* Content Layer */}
       <div className="relative z-20 flex flex-col min-h-screen">
         {/* Navigation Bar */}
-        <header className="glass border-b border-[var(--glass-border)] px-4 sm:px-6 py-3.5 sticky top-0 z-30 shadow-md">
+        <header className="bg-[#11141C]/90 backdrop-blur-xl border-b border-[#292F3C] px-4 sm:px-6 py-3.5 sticky top-0 z-30 shadow-2xl">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="relative group cursor-pointer" onClick={() => setShowTutorial(true)}>
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[var(--purple-dim)] via-[var(--purple-glow)] to-[var(--green-accent)] p-[1.5px] shadow-[0_0_20px_rgba(168,85,247,0.4)]">
-                  <div className="w-full h-full rounded-[14px] bg-[#0c051a] flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-[var(--purple-bright)]" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#8B7CFF] via-[#72D7E8] to-[#63D6A5] p-[1.5px] shadow-[0_0_20px_rgba(139,124,255,0.4)] transition-transform duration-300 group-hover:scale-105">
+                  <div className="w-full h-full rounded-[14px] bg-[#0B0D12] flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-[#8B7CFF]" />
                   </div>
                 </div>
-                <div className="absolute -inset-1 rounded-2xl bg-[var(--green-accent)] opacity-20 blur-sm group-hover:opacity-40 transition-opacity" />
+                <div className="absolute -inset-1 rounded-2xl bg-[#72D7E8] opacity-20 blur-sm group-hover:opacity-40 transition-opacity" />
               </div>
 
               <div>
@@ -162,18 +206,19 @@ export default function App() {
                   <h1 className="text-xl font-black tracking-wider gradient-text font-mono">
                     SURAKSHA
                   </h1>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--green-accent)]/15 text-[var(--green-bright)] border border-[var(--green-accent)]/30 font-semibold">
-                    MVP 1.0
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#63D6A5]/15 text-[#63D6A5] border border-[#63D6A5]/30 font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#63D6A5] animate-ping" />
+                    RAG v3.0 ACTIVE
                   </span>
                 </div>
-                <p className="text-[10px] text-[var(--text-muted)] tracking-widest uppercase">
-                  AI Scam-Call Detection & Negation Guard
+                <p className="text-[10px] text-[#7E889B] tracking-widest uppercase font-mono">
+                  Neural Anti-Scam Intelligence & Negation Shield
                 </p>
               </div>
             </div>
 
             {/* Navigation Tabs */}
-            <nav className="flex items-center gap-1.5 p-1 rounded-2xl glass border-white/10 overflow-x-auto max-w-full">
+            <nav className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#0B0D12]/80 border border-[#292F3C] overflow-x-auto max-w-full">
               <button
                 onClick={() => {
                   audioAlerts.playClick();
@@ -183,8 +228,8 @@ export default function App() {
                   flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap
                   ${
                     activeTab === 'mic'
-                      ? 'bg-gradient-to-r from-[var(--purple-dim)] to-[var(--purple-glow)] text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                      : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
+                      ? 'bg-gradient-to-r from-[#8B7CFF] to-[#6c5ce7] text-white shadow-[0_0_15px_rgba(139,124,255,0.35)] font-semibold'
+                      : 'text-[#7E889B] hover:text-[#E8ECF2] hover:bg-white/5'
                   }
                 `}
               >
@@ -201,8 +246,8 @@ export default function App() {
                   flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap
                   ${
                     activeTab === 'phone'
-                      ? 'bg-gradient-to-r from-[var(--purple-dim)] to-[var(--purple-glow)] text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                      : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
+                      ? 'bg-gradient-to-r from-[#8B7CFF] to-[#6c5ce7] text-white shadow-[0_0_15px_rgba(139,124,255,0.35)] font-semibold'
+                      : 'text-[#7E889B] hover:text-[#E8ECF2] hover:bg-white/5'
                   }
                 `}
               >
@@ -219,8 +264,8 @@ export default function App() {
                   flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap
                   ${
                     activeTab === 'text'
-                      ? 'bg-gradient-to-r from-[var(--purple-dim)] to-[var(--purple-glow)] text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                      : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
+                      ? 'bg-gradient-to-r from-[#8B7CFF] to-[#6c5ce7] text-white shadow-[0_0_15px_rgba(139,124,255,0.35)] font-semibold'
+                      : 'text-[#7E889B] hover:text-[#E8ECF2] hover:bg-white/5'
                   }
                 `}
               >
@@ -237,13 +282,13 @@ export default function App() {
                   flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap
                   ${
                     activeTab === 'intel'
-                      ? 'bg-gradient-to-r from-[var(--purple-dim)] to-[var(--purple-glow)] text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                      : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
+                      ? 'bg-gradient-to-r from-[#8B7CFF] to-[#6c5ce7] text-white shadow-[0_0_15px_rgba(139,124,255,0.35)] font-semibold'
+                      : 'text-[#7E889B] hover:text-[#E8ECF2] hover:bg-white/5'
                   }
                 `}
               >
                 <Database className="w-3.5 h-3.5" />
-                <span>Threat Intel</span>
+                <span>Threat Intel & RAG</span>
               </button>
             </nav>
 
@@ -254,40 +299,40 @@ export default function App() {
                 href="/preview.html"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-1.5 rounded-xl glass hover:bg-white/10 transition-colors text-xs font-mono flex items-center gap-1.5 text-blue-300 hover:text-white border border-blue-500/30"
+                className="px-3 py-1.5 rounded-xl bg-[#171B26] hover:bg-[#202534] transition-colors text-xs font-mono flex items-center gap-1.5 text-[#72D7E8] hover:text-white border border-[#72D7E8]/30 shadow-sm"
                 title="Launch Standalone Spellbreaker Interactive Preview"
               >
-                <Phone className="w-3.5 h-3.5 text-blue-400" />
+                <Phone className="w-3.5 h-3.5 text-[#72D7E8]" />
                 <span className="hidden sm:inline">Spellbreaker UI</span>
               </a>
 
               {/* Sound toggle */}
               <button
                 onClick={handleToggleSound}
-                className="p-2 rounded-xl glass hover:bg-white/10 transition-colors text-[var(--text-muted)] hover:text-white"
+                className="p-2 rounded-xl bg-[#171B26] hover:bg-[#202534] transition-colors text-[#7E889B] hover:text-[#E8ECF2] border border-[#292F3C]"
                 title={isAudioMuted ? 'Unmute Audio Alarms' : 'Mute Audio Alarms'}
               >
                 {isAudioMuted ? (
-                  <VolumeX className="w-4 h-4 text-red-400" />
+                  <VolumeX className="w-4 h-4 text-[#F08091]" />
                 ) : (
-                  <Volume2 className="w-4 h-4 text-emerald-400" />
+                  <Volume2 className="w-4 h-4 text-[#63D6A5]" />
                 )}
               </button>
 
               {/* API Keys status trigger */}
               <button
                 onClick={() => setShowKeysModal(true)}
-                className="px-3 py-1.5 rounded-xl glass hover:bg-white/10 transition-colors text-xs font-mono flex items-center gap-1.5 text-[var(--text-secondary)] hover:text-white border border-[var(--purple-border)]"
+                className="px-3 py-1.5 rounded-xl bg-[#171B26] hover:bg-[#202534] transition-colors text-xs font-mono flex items-center gap-1.5 text-[#A5AFBF] hover:text-white border border-[#292F3C]"
                 title="API Keys Status"
               >
-                <Key className="w-3.5 h-3.5 text-emerald-400" />
+                <Key className="w-3.5 h-3.5 text-[#63D6A5]" />
                 <span className="hidden sm:inline">Sarvam: Live</span>
               </button>
 
               {/* Tutorial trigger */}
               <button
                 onClick={() => setShowTutorial(true)}
-                className="p-2 rounded-xl glass hover:bg-white/10 transition-colors text-[var(--text-muted)] hover:text-white"
+                className="p-2 rounded-xl bg-[#171B26] hover:bg-[#202534] transition-colors text-[#7E889B] hover:text-[#E8ECF2] border border-[#292F3C]"
                 title="How Suraksha Works"
               >
                 <HelpCircle className="w-4 h-4" />
@@ -298,10 +343,10 @@ export default function App() {
 
         {/* Global Threat Alert Bar if HIGH or CRITICAL RISK detected */}
         {(riskLevel === 'HIGH' || riskLevel === 'CRITICAL') && (
-          <div className={`${riskLevel === 'CRITICAL' ? 'bg-rose-950/90 border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.3)]' : 'bg-red-950/80 border-red-500/50'} border-b py-2.5 px-4 backdrop-blur-md animate-pulse`}>
+          <div className={`${riskLevel === 'CRITICAL' ? 'bg-[#2A1218]/90 border-[#F08091]/70 shadow-[0_0_30px_rgba(240,128,145,0.3)]' : 'bg-[#25151A]/80 border-[#F08091]/40'} border-b py-2.5 px-4 backdrop-blur-md animate-pulse`}>
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 text-xs">
-              <div className="flex items-center gap-2 text-red-100 font-semibold">
-                <Flame className="w-4 h-4 text-rose-400 animate-bounce flex-shrink-0" />
+              <div className="flex items-center gap-2 text-[#FFE3E8] font-semibold">
+                <Flame className="w-4 h-4 text-[#F08091] animate-bounce flex-shrink-0" />
                 <span>
                   {riskLevel === 'CRITICAL'
                     ? 'EMERGENCY SCAM INTERCEPT: Active extortion or OTP theft pattern identified! Do not comply or disclose details.'
@@ -310,7 +355,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setActiveTab('phone')}
-                className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] uppercase transition-colors flex-shrink-0"
+                className="px-3 py-1 rounded-lg bg-[#F08091] hover:bg-[#fa5252] text-black font-bold text-[11px] uppercase transition-colors flex-shrink-0 shadow-md"
               >
                 View Call HUD
               </button>

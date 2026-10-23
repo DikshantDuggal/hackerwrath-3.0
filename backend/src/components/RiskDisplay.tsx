@@ -1,5 +1,18 @@
-import { Shield, Mic, MicOff, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
-import type { RiskAssessment } from '../hooks/useLiveDetection';
+import { useState } from 'react';
+import {
+  Shield,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Info,
+  Database,
+  Search,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+} from 'lucide-react';
+import type { RiskAssessment, RetrievedExample } from '../hooks/useLiveDetection';
 
 interface RiskDisplayProps {
   assessment: RiskAssessment | null;
@@ -7,22 +20,28 @@ interface RiskDisplayProps {
 }
 
 export default function RiskDisplay({ assessment, isListening }: RiskDisplayProps) {
+  const [showAllRagExamples, setShowAllRagExamples] = useState(false);
+
   if (!assessment) {
     return (
-      <div className="glass-card p-6 md:p-8 text-center animate-fade-in">
-        <div className="flex flex-col items-center gap-4">
+      <div className="glass-card p-6 md:p-8 text-center animate-fade-in border border-[#292F3C]">
+        <div className="flex flex-col items-center gap-4 py-6">
           <div className="relative">
-            <Shield className="w-16 h-16 text-[var(--purple-bright)] animate-breathe" />
-            <div className="absolute -inset-3 rounded-full bg-[var(--purple-glow)] opacity-10 animate-breathe" />
+            <div className="w-16 h-16 rounded-2xl bg-[#171B26] border border-[#292F3C] flex items-center justify-center shadow-lg">
+              <Shield className="w-8 h-8 text-[#8B7CFF]" />
+            </div>
+            <div className="absolute -inset-2 rounded-2xl bg-[#8B7CFF] opacity-15 blur-md" />
           </div>
-          <h3 className="text-xl font-semibold text-[var(--text-primary)]">
-            {isListening ? 'Listening & Monitoring...' : 'Ready to Protect'}
-          </h3>
-          <p className="text-[var(--text-muted)] max-w-md">
-            {isListening
-              ? 'Analyzing speech patterns in real-time. The shield will alert you if any suspicious patterns are detected.'
-              : 'Start listening or paste a transcript to analyze for potential scam patterns.'}
-          </p>
+          <div>
+            <h3 className="text-lg font-bold text-[#F1F3F8]">
+              {isListening ? 'Active Call Interceptor Online' : 'Ready for Audio or Text Input'}
+            </h3>
+            <p className="text-xs text-[#A2A9BA] max-w-sm mt-1.5 leading-relaxed mx-auto">
+              {isListening
+                ? 'Continuously monitoring dual-channel speech streams against 2,841 indexed scam cases and real-time rule signatures.'
+                : 'Speak into the microphone, simulate an incoming call, or paste text to perform live RAG and rule analysis.'}
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -35,9 +54,10 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
     reasons = [],
     recommended_action = 'Continue with normal caution',
     confidence = 0.9,
-    rule_analysis = { rule_score: 0, triggered_indicators: [], suppressed_protective_matches: [] } as any,
+    rule_analysis = { rule_score: 0, triggered_indicators: [], suppressed_protective_matches: [] },
     contextual_analysis = {} as any,
-  } = assessment || {};
+    rag_classification = null,
+  } = assessment;
 
   const safeReasons = Array.isArray(reasons) ? reasons : [];
   const safeTriggered = Array.isArray(rule_analysis?.triggered_indicators)
@@ -46,47 +66,38 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
   const safeSuppressed = Array.isArray(rule_analysis?.suppressed_protective_matches)
     ? rule_analysis.suppressed_protective_matches
     : [];
+  const retrievedExamples: RetrievedExample[] = rag_classification?.retrieved_examples || [];
 
   const levelConfig = {
     LOW: {
-      icon: <CheckCircle className="w-8 h-8" />,
-      color: 'var(--green-accent)',
-      bgGlow: 'rgba(52, 211, 153, 0.08)',
-      border: 'rgba(52, 211, 153, 0.25)',
+      icon: <CheckCircle className="w-7 h-7 text-[#63D6A5]" />,
+      color: '#63D6A5',
+      badgeBg: 'bg-[#63D6A5]/15 text-[#63D6A5] border-[#63D6A5]/30',
       label: 'SAFE',
-      gradient: 'from-emerald-500/20 to-green-500/10',
     },
     MEDIUM: {
-      icon: <AlertTriangle className="w-8 h-8" />,
-      color: 'var(--amber-warn)',
-      bgGlow: 'rgba(251, 191, 36, 0.08)',
-      border: 'rgba(251, 191, 36, 0.25)',
+      icon: <AlertTriangle className="w-7 h-7 text-[#F2C879]" />,
+      color: '#F2C879',
+      badgeBg: 'bg-[#F2C879]/15 text-[#F2C879] border-[#F2C879]/30',
       label: 'CAUTION',
-      gradient: 'from-amber-500/20 to-yellow-500/10',
     },
     HIGH: {
-      icon: <XCircle className="w-8 h-8" />,
-      color: 'var(--red-alert)',
-      bgGlow: 'rgba(248, 113, 113, 0.08)',
-      border: 'rgba(248, 113, 113, 0.25)',
+      icon: <XCircle className="w-7 h-7 text-[#F08091]" />,
+      color: '#F08091',
+      badgeBg: 'bg-[#F08091]/15 text-[#F08091] border-[#F08091]/30',
       label: 'DANGER',
-      gradient: 'from-red-500/20 to-rose-500/10',
     },
     CRITICAL: {
-      icon: <XCircle className="w-8 h-8 text-rose-500 animate-pulse" />,
-      color: '#ff2d55',
-      bgGlow: 'rgba(255, 45, 85, 0.16)',
-      border: 'rgba(255, 45, 85, 0.45)',
-      label: 'CRITICAL',
-      gradient: 'from-rose-600/30 to-red-600/20',
+      icon: <XCircle className="w-7 h-7 text-[#F08091] animate-pulse" />,
+      color: '#F08091',
+      badgeBg: 'bg-[#F08091]/20 text-[#F08091] border-[#F08091]/50',
+      label: 'CRITICAL FRAUD',
     },
     UNKNOWN: {
-      icon: <Info className="w-8 h-8" />,
-      color: 'var(--text-muted)',
-      bgGlow: 'rgba(139, 122, 173, 0.08)',
-      border: 'rgba(139, 122, 173, 0.25)',
-      label: 'UNKNOWN',
-      gradient: 'from-gray-500/20 to-slate-500/10',
+      icon: <Info className="w-7 h-7 text-[#A2A9BA]" />,
+      color: '#A2A9BA',
+      badgeBg: 'bg-[#A2A9BA]/15 text-[#A2A9BA] border-[#A2A9BA]/30',
+      label: 'EVALUATING',
     },
   };
 
@@ -95,125 +106,183 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
 
   return (
     <div className="space-y-4 animate-slide-up">
-      {/* Main Risk Card */}
-      <div
-        className="glass-card p-6 md:p-8 relative overflow-hidden"
-        style={{ borderColor: config.border }}
-      >
-        {/* Background glow */}
-        <div
-          className="absolute inset-0 opacity-30 pointer-events-none"
-          style={{
-            background: `radial-gradient(circle at 50% 0%, ${config.bgGlow}, transparent 70%)`,
-          }}
-        />
-
-        <div className="relative z-10">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div style={{ color: config.color }}>{config.icon}</div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-sm font-bold tracking-widest"
-                    style={{ color: config.color }}
-                  >
-                    {config.label}
-                  </span>
-                  {(risk_level === 'HIGH' || risk_level === 'CRITICAL') && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
-                      {risk_level === 'CRITICAL' ? '🚨 CRITICAL SCAM DETECTED' : '⚠ SCAM DETECTED'}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[var(--text-primary)] font-semibold mt-1">{caption}</p>
-              </div>
+      {/* Primary Assessment Card */}
+      <div className="glass-card p-6 border border-[#292F3C] space-y-5">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between gap-4 pb-4 border-b border-[#292F3C]">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-[#11141C] border border-[#292F3C] shrink-0">
+              {config.icon}
             </div>
-
-            {/* Risk Score Circle */}
-            <div className="relative w-20 h-20 flex-shrink-0">
-              <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="35" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
-                <circle
-                  cx="40" cy="40" r="35"
-                  fill="none"
-                  stroke={config.color}
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 35}`}
-                  strokeDashoffset={`${2 * Math.PI * 35 * (1 - (scorePercent / 100))}`}
-                  style={{ transition: 'stroke-dashoffset 1s ease-out' }}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-bold" style={{ color: config.color }}>{scorePercent}</span>
-                <span className="text-[10px] text-[var(--text-muted)]">/ 100</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border ${config.badgeBg}`}>
+                  {config.label}
+                </span>
+                <span className="text-xs text-[#70798C] font-mono">
+                  Confidence: {Math.round((confidence || 0.9) * 100)}%
+                </span>
               </div>
+              <h3 className="text-base font-bold text-[#F1F3F8] mt-1 leading-snug">
+                {caption}
+              </h3>
             </div>
           </div>
 
-          {/* Confidence Bar */}
-          {confidence !== null && (
-            <div className="mb-4">
-              <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
-                <span>Analysis Confidence</span>
-                <span>{Math.round(confidence * 100)}%</span>
-              </div>
-              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-1000"
-                  style={{
-                    width: `${confidence * 100}%`,
-                    background: `linear-gradient(90deg, ${config.color}, var(--purple-glow))`,
-                  }}
-                />
-              </div>
+          {/* Radial Score Gauge */}
+          <div className="relative w-16 h-16 shrink-0">
+            <svg className="w-16 h-16 -rotate-90" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(41, 47, 60, 0.6)" strokeWidth="6" />
+              <circle
+                cx="40"
+                cy="40"
+                r="34"
+                fill="none"
+                stroke={config.color}
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 34}`}
+                strokeDashoffset={`${2 * Math.PI * 34 * (1 - scorePercent / 100)}`}
+                style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-sm font-bold font-mono" style={{ color: config.color }}>
+                {scorePercent}
+              </span>
+              <span className="text-[9px] text-[#70798C]">/100</span>
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* Recommended Action */}
-          <div className="glass p-4 mb-4" style={{ borderColor: config.border }}>
-            <p className="text-sm font-medium text-[var(--text-primary)]">
-              <span className="text-[var(--purple-bright)] font-semibold">Recommended: </span>
+        {/* Recommended Immediate Action */}
+        <div className="p-3.5 rounded-xl bg-[#11141C] border border-[#292F3C] flex items-start gap-2.5">
+          <Shield className="w-4 h-4 text-[#8B7CFF] shrink-0 mt-0.5" />
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#8B7CFF] block mb-0.5">
+              Defensive Recommendation
+            </span>
+            <p className="text-xs text-[#F1F3F8] font-medium leading-relaxed">
               {recommended_action}
             </p>
           </div>
+        </div>
 
-          {/* Reasons */}
-          {safeReasons.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--text-secondary)]">Analysis Details</h4>
-              {safeReasons.slice(0, 5).map((reason, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm">
-                  <span className="mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: config.color }} />
-                  <span className="text-[var(--text-muted)]">{reason}</span>
+        {/* Rationale Excerpts */}
+        {safeReasons.length > 0 && (
+          <div className="space-y-1.5 pt-1">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[#A2A9BA]">
+              Behavioral Evaluation
+            </h4>
+            <div className="space-y-1">
+              {safeReasons.slice(0, 3).map((reason, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-[#A2A9BA]">
+                  <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: config.color }} />
+                  <span>{reason}</span>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Triggered Indicators */}
+      {/* RAG GROUNDED SEMANTIC RETRIEVAL CARD */}
+      {(retrievedExamples.length > 0 || rag_classification) && (
+        <div className="glass-card p-5 border border-[#292F3C] space-y-3.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-[#72D7E8]" />
+              <h4 className="text-xs font-bold text-[#F1F3F8] uppercase tracking-wider">
+                Grounded Vector Citations (RAG)
+              </h4>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#72D7E8]/15 text-[#72D7E8] border border-[#72D7E8]/30">
+              2,841 Indexed Corpus
+            </span>
+          </div>
+
+          {rag_classification?.explanation && (
+            <p className="text-xs text-[#A2A9BA] bg-[#11141C] p-2.5 rounded-xl border border-[#292F3C] leading-relaxed">
+              <span className="font-semibold text-[#F1F3F8]">RAG Classification: </span>
+              {rag_classification.explanation}
+            </p>
+          )}
+
+          {/* Retrieved Semantic Reference Examples */}
+          {retrievedExamples.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <span className="text-[10px] text-[#70798C] uppercase tracking-wider block">
+                Top Semantic Neighbor Dialogues:
+              </span>
+              {(showAllRagExamples ? retrievedExamples : retrievedExamples.slice(0, 2)).map((ex, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-[#11141C] border border-[#292F3C] space-y-1.5 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-[9px] font-bold font-mono px-2 py-0.5 rounded-full border ${
+                        ex.label === 'SCAM'
+                          ? 'bg-[#F08091]/15 text-[#F08091] border-[#F08091]/30'
+                          : 'bg-[#63D6A5]/15 text-[#63D6A5] border-[#63D6A5]/30'
+                      }`}
+                    >
+                      {ex.label}
+                    </span>
+                    <span className="text-[10px] text-[#72D7E8] font-mono">
+                      Cosine Sim: {(ex.similarity * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <p className="text-[#A2A9BA] text-[11px] leading-relaxed line-clamp-3 italic">
+                    "{ex.text}"
+                  </p>
+                </div>
+              ))}
+
+              {retrievedExamples.length > 2 && (
+                <button
+                  onClick={() => setShowAllRagExamples(!showAllRagExamples)}
+                  className="w-full py-1 text-[11px] text-[#8B7CFF] hover:underline flex items-center justify-center gap-1"
+                >
+                  {showAllRagExamples ? (
+                    <>
+                      <span>Show Less</span>
+                      <ChevronUp className="w-3 h-3" />
+                    </>
+                  ) : (
+                    <>
+                      <span>View All {retrievedExamples.length} Citations</span>
+                      <ChevronDown className="w-3 h-3" />
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Triggered Rule Indicators */}
       {safeTriggered.length > 0 && (
-        <div className="glass-card p-5">
-          <h4 className="text-sm font-semibold text-[var(--red-alert)] mb-3 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" />
-            Triggered Indicators ({safeTriggered.length})
-          </h4>
+        <div className="glass-card p-5 border border-[#292F3C] space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-[#F08091] uppercase tracking-wider flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Triggered Rule Indicators ({safeTriggered.length})</span>
+            </h4>
+          </div>
           <div className="grid gap-2">
             {safeTriggered.map((ind, i) => (
-              <div key={i} className="glass p-3 text-sm border-red-500/10">
+              <div key={i} className="p-2.5 rounded-xl bg-[#11141C] border border-[#292F3C] text-xs">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-[#F08091]/15 text-[#F08091] border border-[#F08091]/30">
                     {ind.category}
                   </span>
-                  <span className="text-xs text-[var(--text-muted)]">
+                  <span className="text-[10px] text-[#70798C] font-mono">
                     Weight: {Math.round(ind.weight > 1.0 ? ind.weight : ind.weight * 100)}%
                   </span>
                 </div>
-                <p className="text-[var(--text-secondary)] mt-1">{ind.explanation}</p>
+                <p className="text-[#A2A9BA] text-[11px] mt-1">{ind.explanation}</p>
               </div>
             ))}
           </div>
@@ -222,49 +291,18 @@ export default function RiskDisplay({ assessment, isListening }: RiskDisplayProp
 
       {/* Suppressed Protective Matches */}
       {safeSuppressed.length > 0 && (
-        <div className="glass-card p-5">
-          <h4 className="text-sm font-semibold text-[var(--green-accent)] mb-3 flex items-center gap-2">
-            <CheckCircle className="w-4 h-4" />
-            Protective Advice Detected
+        <div className="glass-card p-4 border border-[#292F3C]">
+          <h4 className="text-xs font-bold text-[#63D6A5] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <CheckCircle className="w-3.5 h-3.5" />
+            <span>Protective Negation Suppressed</span>
           </h4>
-          {safeSuppressed.map((match, i) => (
-            <div key={i} className="text-sm text-[var(--text-muted)] flex items-center gap-2 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--green-accent)] flex-shrink-0" />
-              {match}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Contextual AI Insights */}
-      {Boolean(contextual_analysis?.caller_identity_claim) && (
-        <div className="glass-card p-5">
-          <h4 className="text-sm font-semibold text-[var(--purple-bright)] mb-3">
-            Contextual Intelligence
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div className="glass p-3">
-              <span className="text-[var(--text-muted)] text-xs">Claimed Identity</span>
-              <p className="text-[var(--text-primary)] font-medium">{contextual_analysis?.caller_identity_claim}</p>
-            </div>
-            {Boolean(contextual_analysis?.claimed_organisation) && (
-              <div className="glass p-3">
-                <span className="text-[var(--text-muted)] text-xs">Claimed Organization</span>
-                <p className="text-[var(--text-primary)] font-medium">{contextual_analysis?.claimed_organisation}</p>
+          <div className="space-y-1">
+            {safeSuppressed.map((match, i) => (
+              <div key={i} className="text-xs text-[#A2A9BA] flex items-center gap-2 py-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#63D6A5] shrink-0" />
+                <span>{match}</span>
               </div>
-            )}
-            <div className="glass p-3">
-              <span className="text-[var(--text-muted)] text-xs">Intent</span>
-              <p className="font-mono text-xs" style={{ color: config.color }}>
-                {contextual_analysis?.intent_classification || 'Standard'}
-              </p>
-            </div>
-            {Boolean(contextual_analysis?.possible_impersonation) && (
-              <div className="glass p-3 border-red-500/20">
-                <span className="text-[var(--text-muted)] text-xs">Impersonation</span>
-                <p className="text-[var(--red-alert)] font-medium">⚠ Possible Impersonation</p>
-              </div>
-            )}
+            ))}
           </div>
         </div>
       )}
