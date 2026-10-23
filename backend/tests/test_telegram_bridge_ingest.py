@@ -18,6 +18,7 @@ import asyncio
 import io
 import json
 import struct
+import time
 import unittest
 from typing import Any, Dict, List
 
@@ -243,6 +244,10 @@ class TelegramBridgeIngestTestSuite(unittest.TestCase):
             ws.send_bytes(frame_ch1_2)
 
             # Check that channel 0 and channel 1 received their respective frames
+            for _ in range(50):
+                if session.channels[0].total_packets_received == 2 and session.channels[1].total_packets_received == 2:
+                    break
+                time.sleep(0.01)
             self.assertEqual(session.channels[0].total_packets_received, 2)
             self.assertEqual(session.channels[1].total_packets_received, 2)
             self.assertEqual(session.channels[0].next_expected_sample, 3200)
@@ -290,6 +295,10 @@ class TelegramBridgeIngestTestSuite(unittest.TestCase):
 
             # Valid frame after malformed frames: must still be accepted
             ws.send_bytes(struct.pack("<BI", 1, 0) + (b"\x00\x00" * 800))
+            for _ in range(50):
+                if session.channels[1].total_packets_received == 1:
+                    break
+                time.sleep(0.01)
             self.assertEqual(session.channels[1].total_packets_received, 1)
 
             ws.send_text(json.dumps({"type": "call_ended", "reason": "hangup"}))
@@ -315,10 +324,18 @@ class TelegramBridgeIngestTestSuite(unittest.TestCase):
 
             # Packet 1: offset 0, 1600 samples (next_expected_sample becomes 1600)
             ws.send_bytes(struct.pack("<BI", 1, 0) + (b"\x00\x00" * 1600))
+            for _ in range(50):
+                if session.channels[1].next_expected_sample == 1600:
+                    break
+                time.sleep(0.01)
             self.assertEqual(session.channels[1].next_expected_sample, 1600)
 
             # Packet 2 (DUPLICATE): re-send offset 0, 1600 samples
             ws.send_bytes(struct.pack("<BI", 1, 0) + (b"\x00\x00" * 1600))
+            for _ in range(50):
+                if session.channels[1].total_duplicate_frames == 1:
+                    break
+                time.sleep(0.01)
             # Must be flagged as duplicate and suppressed
             self.assertEqual(session.channels[1].total_duplicate_frames, 1)
             self.assertEqual(session.channels[1].next_expected_sample, 1600)
