@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { RiskAssessment } from '../hooks/useLiveDetection';
 import { ALERT_COPY, askKindOf, categoriesOf, chipsOf, isHigh, isPossible } from '../spell/signals';
@@ -102,7 +103,59 @@ export default function RiskDisplay({ assessment, isListening, onOpenAlert }: Ri
         </div>
       )}
 
+      <SoundsLike assessment={assessment} />
       <DetectorDetails assessment={assessment} />
+    </div>
+  );
+}
+
+/** Grounding from the RAG vector store: the nearest real dialogues, scam or genuine. */
+function SoundsLike({ assessment }: { assessment: RiskAssessment }) {
+  const [showAll, setShowAll] = useState(false);
+  const rag = assessment.rag_classification;
+  const examples = rag?.retrieved_examples || [];
+  // Nothing close in the library (or no index built yet): no card rather than an empty one every time.
+  if (!rag || examples.length === 0) return null;
+  const shown = showAll ? examples : examples.slice(0, 2);
+
+  return (
+    <div className="sb-card p-5 flex flex-col gap-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <span className="sb-eyebrow">Sounds like</span>
+          <h4 className="text-[17px] font-extrabold text-head mt-0.5">
+            {rag.insufficient_evidence ? 'No close match in real calls' : 'These real calls'}
+          </h4>
+        </div>
+        <span className="text-[12px] text-faint shrink-0">
+          {rag.classification === 'SCAM' ? 'mostly scams' : rag.classification === 'LEGITIMATE' ? 'mostly genuine' : 'mixed'}
+        </span>
+      </div>
+      {rag.explanation && <p className="text-[13px] text-muted">{rag.explanation}</p>}
+      {shown.length > 0 && (
+        <ul className="flex flex-col gap-2 list-none">
+          {shown.map((ex) => (
+            <li key={ex.example_id} className="sb-soft rounded-[16px] px-4 py-3">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span
+                  className={`sb-chip text-[11px] px-2.5 py-0.5 ${
+                    ex.label === 'SCAM' ? 'bg-danger-soft text-danger-ink' : 'bg-accent-soft text-on-accent-soft'
+                  }`}
+                >
+                  {ex.label === 'SCAM' ? 'Scam call' : 'Genuine call'}
+                </span>
+                <span className="text-[12px] text-faint">{Math.round(ex.similarity * 100)}% alike</span>
+              </div>
+              <p className="text-[13px] text-ink italic line-clamp-3">“{ex.text}”</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      {examples.length > 2 && (
+        <button type="button" onClick={() => setShowAll(!showAll)} className="sb-btn sb-btn-ghost self-start min-h-9 px-3 text-[13px]">
+          {showAll ? 'Show fewer' : `Show all ${examples.length}`}
+        </button>
+      )}
     </div>
   );
 }

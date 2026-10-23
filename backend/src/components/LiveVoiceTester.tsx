@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardR
 import { Mic, MicOff, AlertOctagon, Globe, Trash2, Play, PhoneCall, Headphones } from 'lucide-react';
 import { audioAlerts } from '../utils/audioAlerts';
 import type { RiskAssessment } from '../hooks/useLiveDetection';
+import { fetchRag } from '../spell/rag';
 
 const PRESETS = [
   { label: 'Asks for your OTP', text: 'Sir, please share your 6 digit OTP right now to verify account.' },
@@ -151,6 +152,8 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
           const update = await res.json();
           const assessment: RiskAssessment = update.assessment;
           if (assessment) {
+            // Nearest real dialogues from the RAG store, shown under "Sounds like".
+            assessment.rag_classification = await fetchRag(text.trim());
             onAssessmentUpdate(assessment);
 
             const keywords = (assessment.rule_analysis?.triggered_indicators || []).map(
@@ -195,56 +198,6 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
       }
     },
     [callId, languageCode, onAssessmentUpdate]
-  );
-
-  // Send recorded Audio Blob to Sarvam STT
-  const transcribeAudioBlob = useCallback(
-    async (blob: Blob, liveFallbackText?: string) => {
-      setIsTranscribing(true);
-      setStatusText('Turning the recording into words (Sarvam Saaras)…');
-
-      try {
-        const formData = new FormData();
-        formData.append('file', blob, 'recording.webm');
-        formData.append('language_code', languageCode);
-
-        const transcribeRes = await fetch('/transcribe', {
-          method: 'POST',
-          body: formData,
-        });
-
-        let transcript = '';
-        let confidence = 0.94;
-
-        if (transcribeRes.ok) {
-          const data = await transcribeRes.json();
-          transcript = (data.transcript || '').trim();
-          confidence = data.confidence || 0.94;
-        }
-
-        // If Sarvam returned empty (or failed due to short audio), use Web Speech live preview as fallback
-        if (!transcript && liveFallbackText && liveFallbackText.trim()) {
-          transcript = liveFallbackText.trim();
-        }
-
-        if (transcript) {
-          await evaluateTranscript(transcript, 'microphone', confidence);
-        } else {
-          setStatusText('No speech could be transcribed from the recording.');
-        }
-      } catch (err: any) {
-        console.warn('Sarvam STT error, trying live preview fallback:', err);
-        if (liveFallbackText && liveFallbackText.trim()) {
-          await evaluateTranscript(liveFallbackText.trim(), 'microphone', 0.92);
-        } else {
-          setErrorMsg(err.message || 'Sarvam STT failed to transcribe speech.');
-          setStatusText('Transcription error');
-        }
-      } finally {
-        setIsTranscribing(false);
-      }
-    },
-    [evaluateTranscript, languageCode]
   );
 
   // Start Live Microphone Recording & Continuous WebSocket Stream

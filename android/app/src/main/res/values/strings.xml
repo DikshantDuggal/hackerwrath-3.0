@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English. Hindi goes in values-hi/strings.xml and Punjabi in values-pa/strings.xml,
+     written and checked by native speakers. Missing keys fall back to English. -->
+<resources>
+    <string name="app_name">Edgerunners</string>
+
+    <!-- Sign-in -->
+    <string name="signin_title">Sign in</string>
+    <string name="signin_subtitle">Use the demo account your team shared.</string>
+    <string name="signin_username">Username</string>
+    <string name="signin_password">Password</string>
+    <string name="signin_button">Sign in</string>
+    <string name="signin_error_credentials">That username or password didn\'t match.</string>
+    <string name="signin_error_rate">Too many attempts. Wait a minute and try again.</string>
+    <string name="signin_error_network">Couldn\'t reach the server. Check your connection and try again.</string>
+    <string name="signin_server">Server: %1$s</string>
+
+    <!-- Home -->
+    <string name="home_headline">Protection during your calls</string>
+    <string name="home_scam_check">Scam check</string>
+    <string name="home_scam_on">On for your calls</string>
+    <string name="home_scam_off">Off. Calls won\'t be checked.</string>
+    <string name="home_language">Language</string>
+    <string name="home_expecting">I\'m expecting a payment</string>
+    <string name="home_expecting_sub">Helps spot requests that would make you pay instead</string>
+    <string name="home_save_failed">Couldn\'t save. Try again.</string>
+    <string name="home_service_connecting">Connecting to the warning service…</string>
+    <string name="home_service_offline">Warning service offline. Calls won\'t be checked right now.</string>
+    <string name="home_calling_not_ready">Phone calls aren\'t set up yet. Demo calls still work.</string>
+    <string name="home_demo_title">Demo call</string>
+    <string name="home_demo_sub">Plays a scripted call so you can see the warnings.</string>
+    <string name="home_demo_qr">QR scan</string>
+    <string name="home_demo_otp">OTP</string>
+    <string name="home_demo_harmless">Harmless</string>
+    <string name="home_demo_unavailable">Unavailable</string>
+    <string name="home_demo_failed">Couldn\'t start the demo call. Check the server.</string>
+    <string name="home_sign_out">Sign out</string>
+
+    <!-- Incoming call -->
+    <string name="incoming_title">Incoming call</string>
+    <string name="unknown_number">Unknown number</string>
+    <string name="scam_check_on">Scam check on</string>
+    <string name="scam_check_off">Scam check off</string>
+    <string name="answer">Answer</string>
+    <string name="decline">Decline</string>
+
+    <!-- In call -->
+    <string name="in_call_subtitle">Unknown number · %1$s</string>
+    <string name="status_starting">Scam check starting…</string>
+    <string name="status_listening">Scam check on · Listening</string>
+    <string name="status_checking">Checking a payment request…</string>
+    <string name="status_checking_sub">Possible risk. Don\'t share or scan anything yet.</string>
+    <string name="status_unavailable">Protection unavailable right now</string>
+    <string name="status_unavailable_sub">Be careful with any payment request.</string>
+    <string name="status_off">Scam check off</string>
+    <string name="status_continued">You chose to continue</string>
+    <string name="mute">Mute</string>
+    <string name="speaker">Speaker</string>
+    <string name="end_call">End call</string>
+
+    <!-- Alert -->
+    <string name="level_possible">Possible risk</string>
+    <string name="level_high">High risk</string>
+    <string name="automatic_check">Automatic check</string>
+    <string name="alert_qr_title">They asked you to scan a QR code to receive money.</string>
+    <string name="alert_pin_title">They asked for your UPI PIN to receive money.</string>
+    <string name="alert_receive_body">Receiving money does not require scanning a QR code or entering your UPI PIN.</string>
+    <string name="alert_receive_next">End the call. Check the payment in your own bank app.</string>
+    <string name="alert_otp_title">They asked you to share an OTP.</string>
+    <string name="alert_otp_body">An OTP can let someone take money or your account. Never share it on a call.</string>
+    <string name="alert_otp_next">End the call. If it was your bank, call the number on your card.</string>
+    <string name="alert_remote_title">They asked you to install an app or share your screen.</string>
+    <string name="alert_remote_body">With your screen or an app, someone can see your codes and take your money. Never do it for a caller.</string>
+    <string name="next_step">Next step</string>
+    <string name="spoken_warning">Spoken warning playing</string>
+    <string name="continue_call">Continue</string>
+
+    <!-- Call ended -->
+    <string name="ended_user">Call ended</string>
+    <string name="ended_caller">The caller ended the call</string>
+    <string name="ended_declined">Call declined</string>
+    <string name="ended_body">If you shared a code or made a payment, call your bank from the number on your card.</string>
+    <string name="back_home">Back to home</string>
+
+    <!-- Notifications -->
+    <string name="channel_alerts">Scam warnings</string>
+    <string name="channel_alerts_desc">Warnings during a call when someone asks for a payment, PIN or OTP.</string>
+    <string name="channel_call">Ongoing call</string>
+    <string name="call_notification">Call in progress · Scam check on</string>
+
+    <!-- ===== Spellbreaker ===== -->
+
+    <!-- Tabs and chrome -->
+    <string name="sb_tab_recents">Recents</string>
+    <string name="sb_tab_home">Home</string>
+    <string name="sb_tab_contacts">Contacts</string>
+    <string name="sb_your_circle">Your circle</string>
+    <string name="sb_premium">PREMIUM</string>
+    <string name="sb_settings">Settings</string>
+    <string name="sb_keypad">Keypad</string>
+    <string name="sb_close">Close</string>
+    <string name="sb_done">Done</string>
+    <string name="sb_today">Today</string>
+    <string name="sb_not_built">Demo only. This isn\'t connected yet.</string>
+    <string name="sb_cant_open">Couldn\'t open that on this phone.</string>
+    <string name="sb_expanded">Expanded</string>
+    <string name="sb_collapsed">Collapsed</string>
+
+    <!-- Home -->
+    <string name="sb_chip_on">Scam check is on</string>
+    <string name="sb_chip_off">Scam check is off</string>
+    <string name="sb_chip_offline">Scam check can\'t connect</string>
+    <string name="sb_home_title_on">Listening on every call</string>
+    <string name="sb_home_title_off">Scam check is off</string>
+    <string name="sb_home_title_offline">Can\'t reach the warning service</string>
+    <string name="sb_guard_on_a11y">Scam check is on. Tap to turn it off.</string>
+    <string name="sb_guard_off_a11y">Scam check is off. Tap to turn it on.</string>
+    <plurals name="sb_scams_stopped">
+        <item quantity="one">scam stopped this week</item>
+        <item quantity="other">scams stopped this week</item>
+    </plurals>
+    <plurals name="sb_stopped_sub">
+        <item quantity="one">You hung up within %d second of every ask.</item>
+        <item quantity="other">You hung up within %d seconds of every ask.</item>
+    </plurals>
+    <string name="sb_stopped_none">Nothing to stop yet. We\'re listening.</string>
+    <plurals name="sb_calls_checked">
+        <item quantity="one">%d call checked</item>
+        <item quantity="other">%d calls checked</item>
+    </plurals>
+    <plurals name="sb_warnings_count">
+        <item quantity="one">%d warning</item>
+        <item quantity="other">%d warnings</item>
+    </plurals>
+    <string name="sb_day_calm">Nobody asked for a QR scan, a PIN or an OTP.</string>
+    <string name="sb_day_qr">A caller asked you to scan a QR.</string>
+    <string name="sb_day_pin">A caller asked for your UPI PIN.</string>
+    <string name="sb_day_otp">A caller asked for your OTP.</string>
+    <string name="sb_day_remote">A caller asked for your screen or an app.</string>
+    <string name="sb_fuse_left">%1$s · they asked</string>
+    <string name="sb_fuse_hung_up">you hung up · %1$d s</string>
+    <string name="sb_fuse_caller_left">they hung up · %1$d s</string>
+    <string name="sb_fuse_kept">you kept talking</string>
+    <string name="sb_stat_checked">checked</string>
+    <plurals name="sb_stat_warnings">
+        <item quantity="one">warning</item>
+        <item quantity="other">warnings</item>
+    </plurals>
+    <string name="sb_stat_fastest">fastest</string>
+    <string name="sb_seconds_short">%1$d s</string>
+    <string name="sb_open_recents">Open recents</string>
+    <string name="sb_help_title">Already paid or shared a code?</string>
+    <string name="sb_help_sub">Four steps to take right now</string>
+    <string name="sb_help_sub_story">Four steps, in order. Do them now.</string>
+
+    <!-- Recents -->
+    <string name="sb_filter_all">All calls</string>
+    <string name="sb_filter_warn">Only warnings</string>
+    <string name="sb_group_yesterday">Yesterday</string>
+    <string name="sb_rec_empty">No calls yet. Calls you answer will show here.</string>
+    <string name="sb_rec_asked_qr">Asked you to scan a QR</string>
+    <string name="sb_rec_asked_pin">Asked for your UPI PIN</string>
+    <string name="sb_rec_asked_otp">Asked for your OTP</string>
+    <string name="sb_rec_asked_remote">Asked for your screen or an app</string>
+    <string name="sb_rec_hung_up">%1$s · you hung up</string>
+    <string name="sb_rec_kept">%1$s · you kept talking</string>
+    <string name="sb_rec_caller_left">%1$s · they hung up</string>
+    <string name="sb_rec_calm">Checked · nothing was asked · %1$s</string>
+    <string name="sb_rec_off">Scam check was off · %1$s</string>
+    <string name="sb_rec_secs">%1$d s to hang up</string>
+    <string name="sb_rec_secs_caller">%1$d s, then they hung up</string>
+    <string name="sb_rec_kept_short">kept talking</string>
+    <string name="sb_rec_detail_qr">They asked you to scan a QR code to receive money.</string>
+    <string name="sb_rec_detail_pin">They asked for your UPI PIN to receive money.</string>
+    <string name="sb_rec_detail_otp">They asked for the code sent to your phone.</string>
+    <string name="sb_rec_detail_remote">They asked you to install an app or share your screen.</string>
+    <string name="sb_truth_receive">Receiving money never needs a scan or your UPI PIN.</string>
+    <string name="sb_truth_otp">No real bank or delivery company asks for an OTP on a call.</string>
+    <string name="sb_truth_remote">No real bank or company needs your screen or an app on your phone.</string>
+    <string name="sb_report">Report number</string>
+    <string name="sb_block">Block</string>
+    <string name="sb_tell">Tell %1$s</string>
+    <string name="sb_help_link">Already paid or shared a code? Get help →</string>
+    <string name="sb_rec_privacy">Only times and request types are kept, on this phone. Never what anyone said.</string>
+    <string name="sb_demo_tag">demo</string>
+
+    <!-- Contacts and your circle (sample people for now) -->
+    <string name="sb_search_hint">Search contacts or a number</string>
+    <string name="sb_see_circle">See circle →</string>
+    <string name="sb_add">Add</string>
+    <string name="sb_add_circle_a11y">Add someone to your circle</string>
+    <string name="sb_circle_a11y">%1$s, in your circle</string>
+    <string name="sb_in_circle_prefix">In your circle</string>
+    <string name="sb_no_results">No contacts match. Tap the keypad to call the number instead.</string>
+    <string name="sb_uses_app">uses Edgerunners, so they\'re protected on calls too</string>
+    <string name="sb_uses_app_a11y">Uses Edgerunners</string>
+    <string name="sb_uses_app_badge">Uses Edgerunners · protected on calls</string>
+    <string name="sb_rel_brother">Brother</string>
+    <string name="sb_rel_bank">From the back of my card</string>
+    <string name="sb_rel_told">Told if you get a high-risk call</string>
+    <string name="sb_rel_lookout">You look out for her</string>
+    <string name="sb_call">Call</string>
+    <string name="sb_open_circle">Open circle</string>
+    <string name="sb_add_to_circle">Add to circle</string>
+    <string name="sb_circle_note_in">In your circle: %1$s.</string>
+    <string name="sb_circle_note_add">Add them so they\'re told if you get a high-risk call, or so you can look out for them.</string>
+    <string name="sb_circle_title">%1$s looks out for you. You look out for %2$s.</string>
+    <string name="sb_you">YOU</string>
+    <string name="sb_role_brother">brother</string>
+    <string name="sb_role_to_tell">to tell</string>
+    <string name="sb_role_protect">Protect</string>
+    <string name="sb_role_a_parent">a parent</string>
+    <string name="sb_scam_check_on_short">scam check on</string>
+    <string name="sb_told_about">told about you</string>
+    <string name="sb_look_out_for">you look out for</string>
+    <string name="sb_circ_eyebrow_mum">You look out for</string>
+    <string name="sb_circ_eyebrow_in">Inner ring</string>
+    <string name="sb_circ_eyebrow_out">Outer ring</string>
+    <string name="sb_mum_story">A caller asked her to scan a QR. She hung up.</string>
+    <string name="sb_mum_fuse_left">Tue 16:40 · they asked</string>
+    <string name="sb_mum_fuse_right">she hung up · 7 s</string>
+    <string name="sb_call_name">Call %1$s</string>
+    <string name="sb_her_week">Her week</string>
+    <string name="sb_arjun_body">Your brother. After a high-risk call he gets one text: the kind of request, never what was said.</string>
+    <string name="sb_would_get">What %1$s would get</string>
+    <string name="sb_arjun_text">Edgerunners: Priya got a high-risk call at 11:42. They asked her to scan a QR. She hung up after 6 s.</string>
+    <string name="sb_send_test">Send a test</string>
+    <string name="sb_remove">Remove</string>
+    <string name="sb_add_tell_title">Add someone to tell</string>
+    <string name="sb_add_tell_body">Pick someone you trust. If a caller ever gets you to the high-risk stage, they get a short text so they can check on you.</string>
+    <string name="sb_choose_contact">Choose a contact</string>
+    <string name="sb_protect_title">Protect a parent</string>
+    <string name="sb_protect_body">Install Edgerunners on their phone and scan the code from yours. Two minutes, and you\'ll see when they get a warning.</string>
+    <string name="sb_show_code">Show my setup code</string>
+    <string name="sb_circle_privacy">Your circle only ever sees that a warning happened, never what was said.</string>
+
+    <!-- Keypad -->
+    <string name="sb_keypad_hint">Scam check stays on for calls you make too</string>
+    <string name="sb_not_in_contacts">Not in your contacts</string>
+    <string name="sb_delete">Delete</string>
+    <string name="sb_type_number">Type a number first</string>
+
+    <!-- Settings -->
+    <string name="sb_warnings_in">Warnings spoken in</string>
+    <string name="sb_lang_native_en" translatable="false">English</string>
+    <string name="sb_lang_native_hi" translatable="false">हिन्दी</string>
+    <string name="sb_lang_native_pa" translatable="false">ਪੰਜਾਬੀ</string>
+    <string name="sb_lang_name_en">English</string>
+    <string name="sb_lang_name_hi">Hindi</string>
+    <string name="sb_lang_name_pa">Punjabi</string>
+    <string name="sb_feel">Feel a warning</string>
+    <string name="sb_feel_sub">Practise once, so you know it when it\'s real</string>
+    <string name="sb_sell_on">Stronger warnings if a caller asks you to pay.</string>
+    <string name="sb_sell_off">Turn on stronger warnings when you\'re selling something.</string>
+    <string name="sb_toast_expect_on">Warnings get stronger if a caller asks you to pay</string>
+    <string name="sb_toast_expect_off">Back to normal warnings</string>
+    <string name="sb_circle_row_sub">%1$s is told after a high-risk call</string>
+    <string name="sb_for_demos">For demos</string>
+    <string name="sb_demo_calls">Demo calls</string>
+    <string name="sb_demo_calls_sub">Scripted calls for showing the app</string>
+
+    <!-- Demo calls -->
+    <string name="sb_demo_scripted">Scripted. Nobody is really calling.</string>
+    <string name="sb_mark_qr" translatable="false">QR</string>
+    <string name="sb_mark_otp" translatable="false">OTP</string>
+    <string name="sb_mark_calm">Hi</string>
+    <string name="sb_mark_unavailable" translatable="false">?</string>
+    <string name="sb_demo_qr_title">Scam: QR to receive money</string>
+    <string name="sb_demo_qr_sub">A “buyer” on a marketplace call</string>
+    <string name="sb_demo_otp_title">Scam: asks for your OTP</string>
+    <string name="sb_demo_otp_sub">Someone claiming to be your bank</string>
+    <string name="sb_demo_calm_title">Ordinary call</string>
+    <string name="sb_demo_calm_sub">No payment requests</string>
+    <string name="sb_demo_unavailable_title">Protection drops out</string>
+    <string name="sb_demo_unavailable_sub">The warning service goes quiet mid-call</string>
+    <string name="sb_demo_shortcut">Shortcut: long-press the shield on Home.</string>
+
+    <!-- Already paid or shared a code? -->
+    <string name="sb_recovery_sub">Do these now, in this order. The sooner, the better.</string>
+    <string name="sb_step_helpline">Call 1930, the cyber crime helpline</string>
+    <string name="sb_step_report">Report it at cybercrime.gov.in</string>
+    <string name="sb_step_bank">Call your bank on the number on your card</string>
+    <string name="sb_step_bank_toast">Use the number printed on your card</string>
+    <string name="sb_step_tell">Tell your trusted person</string>
+    <string name="sb_step_call">Call</string>
+    <string name="sb_step_open">Open</string>
+    <string name="sb_step_send">Send</string>
+
+    <!-- At your ear -->
+    <string name="sb_listening">Listening with you</string>
+    <string name="sb_ear_note">Your screen is off at your ear. If they ask for money, you\'ll feel a buzz and hear a voice.</string>
+    <string name="sb_heard_qr">Heard: a QR code to “receive” money</string>
+    <string name="sb_heard_pin">Heard: a request for your UPI PIN</string>
+    <string name="sb_heard_otp">Heard: a request for your OTP</string>
+    <string name="sb_heard_remote">Heard: a request for your screen or an app</string>
+
+    <!-- The alert -->
+    <string name="sb_asked_ago">they asked %1$d s ago</string>
+    <string name="sb_word_qr">DON\'T SCAN.</string>
+    <string name="sb_word_pin">NO PIN.</string>
+    <string name="sb_word_otp">DON\'T SHARE.</string>
+    <string name="sb_pword_qr">Don\'t scan.</string>
+    <string name="sb_pword_pin">No PIN.</string>
+    <string name="sb_pword_otp">Don\'t share.</string>
+    <string name="sb_word_remote">NO APPS.</string>
+    <string name="sb_pword_remote">No apps.</string>
+    <string name="sb_line_remote">They want an app on your phone or your screen. With it, they can see your codes and take your money.</string>
+    <string name="sb_q_remote">Did they say it\'s to fix your account?</string>
+    <string name="sb_yes_remote">That is the trick. Nobody needs your screen or an app to fix your account.</string>
+    <string name="sb_no_remote">Whoever they are: never install an app or share your screen for a caller.</string>
+    <string name="sb_what_they_said">What they said</string>
+    <string name="signal_otp_or_pin_request">Wants a code or PIN</string>
+    <string name="signal_remote_access">Wants your screen or an app</string>
+    <string name="signal_financial_solicitation">Wants money</string>
+    <string name="signal_authority_impersonation">Claims to be your bank</string>
+    <string name="signal_coercive_threat">Pressuring you</string>
+    <string name="signal_account_suspension_threat">Threatens your account</string>
+    <string name="sb_line_qr">They said scanning a QR gets you money. Scanning sends money out.</string>
+    <string name="sb_line_pin">They said your UPI PIN gets you money. Your PIN only ever sends money out.</string>
+    <string name="sb_line_otp">They asked for the code sent to your phone. With it, they can take your money.</string>
+    <string name="sb_q_qr">Did they say scanning puts money into your account?</string>
+    <string name="sb_q_pin">Did they say your PIN puts money into your account?</string>
+    <string name="sb_q_otp">Did they say they are from your bank?</string>
+    <string name="sb_yes">Yes</string>
+    <string name="sb_no">No / not sure</string>
+    <string name="sb_yes_qr">That is the trick. Scanning and typing your PIN only ever sends money out.</string>
+    <string name="sb_no_qr">Whatever they said: you never need to scan or enter your UPI PIN to receive money.</string>
+    <string name="sb_yes_otp">Banks never ask for an OTP on a call. Hang up and call the number on your card.</string>
+    <string name="sb_no_otp">Whoever they are: never read an OTP out on a call.</string>
+    <string name="sb_hold_caller">Put them on hold · 30 s</string>
+    <string name="sb_keep_talking">Hold to keep talking</string>
+    <string name="sb_keep_holding">Keep holding…</string>
+    <string name="sb_keep_talking_a11y">Keep talking. Press and hold.</string>
+
+    <!-- On hold -->
+    <string name="sb_on_hold">They\'re on hold</string>
+    <string name="sb_on_hold_body">They hear hold music and nothing else. Take a breath. Nothing happens until you choose.</string>
+    <string name="sb_back_to_call">Back to the call</string>
+    <string name="sb_notice_hold_unavailable">Hold isn\'t available on this call yet.</string>
+    <string name="sb_notice_resume_failed">Couldn\'t take them off hold. Try again.</string>
+    <string name="sb_notice_reported">Reported. Thank you.</string>
+    <string name="sb_notice_report_failed">Couldn\'t send the report. Try again.</string>
+
+    <!-- After the call -->
+    <string name="sb_after_call">After the call</string>
+    <plurals name="sb_story_stopped">
+        <item quantity="one">You hung up %d second after they asked.</item>
+        <item quantity="other">You hung up %d seconds after they asked.</item>
+    </plurals>
+    <string name="sb_story_stopped_body">You felt it, heard it, and ended the call. That is exactly how this scam fails.</string>
+    <string name="sb_story_kept">You kept going. We stayed with you.</string>
+    <string name="sb_story_kept_body">If you scanned, paid or read out a code, act now. It\'s not too late to report it.</string>
+    <string name="sb_story_caller">They hung up after the warning.</string>
+    <string name="sb_story_caller_body">If you scanned, paid or read out a code before they went, act now.</string>
+    <string name="sb_story_calm">We didn\'t hear them ask for anything.</string>
+    <string name="sb_story_calm_body">No QR scan, UPI PIN or OTP request. We never call a call safe; we only say what we heard.</string>
+    <string name="sb_story_off">Scam check was off for this call.</string>
+    <string name="sb_story_off_body">Turn scam check back on from Home to have every call checked.</string>
+    <string name="sb_story_declined_body">The call wasn\'t answered, so nothing was checked.</string>
+    <string name="sb_nothing_recorded">Nothing from this call was recorded.</string>
+    <string name="sb_back_home">Back home</string>
+
+    <!-- Practice -->
+    <string name="sb_practice">Practice</string>
+    <string name="sb_practice_title">This is what a warning feels like</string>
+    <string name="sb_practice_body">Two short buzzes and a long one, then a voice in your ear in %1$s. Only you hear it.</string>
+    <string name="sb_voice_qr">Careful. They\'re asking you to scan a QR to get money. That\'s how this scam works.</string>
+    <string name="sb_practice_again">Feel it again</string>
+</resources>

@@ -272,9 +272,23 @@ curl -s -X POST http://localhost:8000/internal/live/spike-simulation | python3 -
 ```
 
 #### Real-Time Audio Streaming WebSockets:
-- **`WS /internal/live/ingest`**: Protocol for `onfloor/apps/telegram-bridge` (py-tgcalls / pyrogram). Accepts binary frames: Byte 0 (channel), Bytes 1-4 (sample offset), Bytes 5+ (16kHz PCM16LE mono).
+- **`WS /internal/live/ingest`**: Protocol for `apps/telegram-bridge` (py-tgcalls / pyrogram). Accepts binary frames: Byte 0 (channel), Bytes 1-4 (sample offset), Bytes 5+ (16kHz PCM16LE mono). Fully supports:
+  - Dual-channel separation: Channel 0 (`AGENT` / local headset mic), Channel 1 (`CUSTOMER` / remote Telegram caller).
+  - Sample-offset monotonicity, gap detection, duplicate offset suppression, and bounded backpressure.
+  - 15-second reconnect grace period preventing session duplication across network dropouts.
+  - Telethon QR code pairing in `apps/telegram-bridge/login.py` with automatic Pyrogram session export.
 - **`WS /internal/live/browser-stream`**: Direct continuous browser microphone streaming for ongoing phone or Telegram calls without restarts. Streams progressive ~7-8 word chunks.
 - **`WS /internal/live/events`**: Real-time HUD dashboard event bus broadcasting live captions, dynamic risk scores, and alert notifications.
+
+#### Telegram Audio Bridge Execution (`apps/telegram-bridge`):
+```bash
+# 1. One-time authentication via Telegram QR code (instant pairing)
+cd apps/telegram-bridge
+python login.py
+
+# 2. Run the dual-channel audio bridge
+python bridge.py
+```
 
 ---
 

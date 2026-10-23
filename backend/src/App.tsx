@@ -15,6 +15,7 @@ import ScamAlert from './components/ScamAlert';
 import { audioAlerts } from './utils/audioAlerts';
 import { useHistory, type CheckSource } from './spell/history';
 import { askKindOf, categoriesOf, chipsOf, isHigh, toneOf, type AskKind } from './spell/signals';
+import { fetchRag } from './spell/rag';
 import type { RiskAssessment, TranscriptSegment } from './hooks/useLiveDetection';
 
 type ActiveTab = 'mic' | 'phone' | 'text' | 'intel';
@@ -52,7 +53,7 @@ export default function App() {
   const [isAudioMuted, setIsAudioMuted] = useState<boolean>(false);
   const [showTutorial, setShowTutorial] = useState(() => {
     try {
-      return !localStorage.getItem('suraksha_tutorial_seen');
+      return !localStorage.getItem('suraksha_tutorial_completed');
     } catch {
       return false;
     }
@@ -135,7 +136,7 @@ export default function App() {
   const handleCloseTutorial = useCallback(() => {
     setShowTutorial(false);
     try {
-      localStorage.setItem('suraksha_tutorial_seen', 'true');
+      localStorage.setItem('suraksha_tutorial_completed', 'true');
     } catch {
       // Ignore: the tour shows again next visit.
     }
@@ -171,18 +172,23 @@ export default function App() {
       };
       setTranscriptHistory((prev) => [...prev, newSeg]);
 
-      const res = await fetch('/analyze/transcript', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: text,
-          language_code: 'auto',
-          transcript_confidence: 0.98,
+      // The rule and context detector and the RAG vector search run side by side.
+      const [res, rag] = await Promise.all([
+        fetch('/analyze/transcript', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: text,
+            language_code: 'auto',
+            transcript_confidence: 0.98,
+          }),
         }),
-      });
+        fetchRag(text),
+      ]);
 
       if (res.ok) {
         const assessment: RiskAssessment = await res.json();
+        assessment.rag_classification = rag;
         history.addCheck('text');
         handleAssessment(assessment, 'text');
 
@@ -204,18 +210,22 @@ export default function App() {
   // Segment analysis for Phone Simulator
   const handleAnalyzeSegment = async (text: string): Promise<RiskAssessment | null> => {
     try {
-      const res = await fetch('/analyze/transcript', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transcript: text,
-          language_code: 'auto',
-          transcript_confidence: 0.95,
+      const [res, rag] = await Promise.all([
+        fetch('/analyze/transcript', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: text,
+            language_code: 'auto',
+            transcript_confidence: 0.95,
+          }),
         }),
-      });
+        fetchRag(text),
+      ]);
 
       if (res.ok) {
         const assessment: RiskAssessment = await res.json();
+        assessment.rag_classification = rag;
         handleAssessment(assessment, 'call');
         setTranscriptHistory((prev) => [
           ...prev,
@@ -377,6 +387,10 @@ export default function App() {
               activeRisk={activeRisk}
               onCallStart={() => history.addCheck('call')}
               onRegisterHangUp={registerHangUp}
+              onCheckAsText={(transcript) => {
+                setActiveTab('text');
+                handleAnalyzeText(transcript);
+              }}
             />
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-7">
@@ -431,7 +445,7 @@ export default function App() {
           {...alertActions(alert)}
         />
       )}
-      <TutorialModal isOpen={showTutorial} onClose={handleCloseTutorial} />
+      <TutorialModal isOpen={showTutorial} onClose={handleCloseTutorial} onNavigateTab={setActiveTab} />
       <KeysModal isOpen={showKeysModal} onClose={() => setShowKeysModal(false)} />
     </div>
   );

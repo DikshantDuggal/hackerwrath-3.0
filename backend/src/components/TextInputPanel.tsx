@@ -3,24 +3,28 @@ import { ArrowUp } from 'lucide-react';
 
 const DEMO_SCENARIOS = [
   {
-    label: 'QR scam · Hindi',
-    text: 'भाई मैं आर्मी में हूँ, क्यूआर भेज रहा हूँ, स्कैन करो पेमेंट तुरंत आ जाएगा।',
+    label: 'Army QR scam · Hindi',
+    text: 'भाई मैं आर्मी कैंट से बोल रहा हूँ, क्यूआर कोड भेज रहा हूँ, स्कैन करो और यूपीआई पिन डालो पेमेंट तुरंत आ जाएगा।',
   },
   {
-    label: 'Fake RBI officer',
-    text: 'I am calling from RBI Cyber Crime Branch. An arrest warrant is issued against your Aadhaar. Install AnyDesk and share the OTP immediately.',
+    label: 'CBI digital arrest',
+    text: 'This is Officer Verma calling from CBI Cyber Crime Branch. An arrest warrant is issued on your Aadhaar card for money laundering. Transfer ₹50,000 security clearance deposit to RBI escrow immediately.',
   },
   {
-    label: 'OTP ask · Hinglish',
-    text: 'Aapke phone pe ek OTP aaya hai, jaldi se batao. Account block ho jayega agar nahi bataya.',
+    label: 'Bank KYC OTP ask',
+    text: 'Aapke phone pe ek 6 digit ka bank verification OTP aaya hai, jaldi se batao. Account block ho jayega agar nahi bataya.',
+  },
+  {
+    label: 'Electricity bill, install AnyDesk',
+    text: 'Your electricity power connection will be disconnected tonight. Install AnyDesk application immediately to update your payment.',
   },
   {
     label: 'Safety advice, not an ask',
-    text: 'Never share your OTP or UPI PIN with anyone on a phone call. Kabhi bhi kisi ko OTP mat batana.',
+    text: 'Never share your confidential OTP or enter your UPI PIN with anyone on an incoming phone call. Call your bank directly from your card number.',
   },
   {
     label: 'A real buyer',
-    text: 'Can you send me your QR? I\'ll pay you now. I am interested in the refrigerator you listed.',
+    text: 'Hello, I saw your advertisement on OLX regarding the sofa set. Is it still available for inspection this weekend?',
   },
   {
     label: 'OTP ask · Punjabi',

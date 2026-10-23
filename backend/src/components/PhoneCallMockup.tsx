@@ -13,13 +13,45 @@ interface PhoneCallMockupProps {
   onCallStart?: () => void;
   /** Lets the alert's "End call" hang up this demo call. */
   onRegisterHangUp?: (hangUp: (() => void) | null) => void;
+  /** Run a script's whole transcript through Text check instead of ringing. */
+  onCheckAsText?: (transcript: string) => void;
+}
+
+const FILTERS: Array<{ id: string; label: string; match: (s: DemoScenario) => boolean }> = [
+  { id: 'ALL', label: 'All', match: () => true },
+  { id: 'EXTORTION', label: 'Digital arrest', match: (s) => s.category.includes('THREAT') || s.id.includes('digital-arrest') },
+  { id: 'QR_SCAN', label: 'UPI and QR', match: (s) => s.category.includes('QR') || s.id.includes('qr') },
+  {
+    id: 'URGENCY',
+    label: 'OTP and KYC',
+    match: (s) => s.category.includes('OTP') || s.category.includes('REMOTE') || s.id.includes('kyc') || s.id.includes('anydesk'),
+  },
+  {
+    id: 'TASK',
+    label: 'Part-time tasks',
+    match: (s) => s.category.includes('TASK') || s.category.includes('URGENT_PAYMENT') || s.id.includes('lottery') || s.id.includes('task'),
+  },
+  { id: 'SAFE', label: 'Ordinary calls', match: (s) => s.expectedRisk === 'LOW' },
+];
+
+/** Said aloud on high risk, so the warning reaches you even with the phone at your ear. */
+function speakWarning(message: string) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.05;
+    window.speechSynthesis.speak(utterance);
+  }
 }
 
 type CallState = 'IDLE' | 'RINGING' | 'IN_CALL' | 'ENDED';
 
 const stripEmoji = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, '').trim();
 
-export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, onCallStart, onRegisterHangUp }: PhoneCallMockupProps) {
+export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, onCallStart, onRegisterHangUp, onCheckAsText }: PhoneCallMockupProps) {
+  const [filter, setFilter] = useState('ALL');
+  const [afterCall, setAfterCall] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario>(DEMO_SCENARIOS[0]);
   const [callState, setCallState] = useState<CallState>('IDLE');
   const [callDuration, setCallDuration] = useState(0);
@@ -77,6 +109,7 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, onCallSt
   const startScenario = async (scenario: DemoScenario) => {
     if (scenarioTimeoutRef.current) clearTimeout(scenarioTimeoutRef.current);
     setSelectedScenario(scenario);
+    setAfterCall(false);
     setDisplayedTranscript([]);
     setSimulatedRisk(null);
     setCallState('RINGING');
@@ -105,6 +138,7 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, onCallSt
           setSimulatedRisk(assessment);
           if (assessment.risk_level === 'HIGH' || assessment.risk_level === 'CRITICAL') {
             audioAlerts.playHighRiskAlert();
+            speakWarning('Warning. Do not share a code, scan a QR code, or enter your PIN.');
           } else if (assessment.risk_level === 'MEDIUM') {
             audioAlerts.playCautionAlert();
           } else {
@@ -122,6 +156,7 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, onCallSt
   const handleHangUp = () => {
     if (scenarioTimeoutRef.current) clearTimeout(scenarioTimeoutRef.current);
     setCallState('ENDED');
+    setAfterCall(true);
     setIsSimulating(false);
     audioAlerts.playClick();
     setTimeout(() => {
@@ -173,16 +208,34 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, onCallSt
             Scripted callers, real detector: each line goes to the backend as it is said.
           </p>
 
+          <div role="radiogroup" aria-label="Kind of scam" className="flex flex-wrap gap-1.5 mb-3">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                role="radio"
+                aria-checked={filter === f.id}
+                onClick={() => setFilter(f.id)}
+                className={`sb-chip text-[12px] px-3 py-1.5 transition-colors ${
+                  filter === f.id ? 'bg-accent text-on-accent' : 'bg-surface text-muted hover:text-ink'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           <ul className="flex flex-col gap-2 max-h-[520px] overflow-y-auto pr-1 list-none">
-            {DEMO_SCENARIOS.map((scen) => {
+            {DEMO_SCENARIOS.filter((FILTERS.find((f) => f.id === filter) || FILTERS[0]).match).map((scen) => {
               const isSelected = selectedScenario.id === scen.id && (callState === 'IN_CALL' || callState === 'RINGING');
               const danger = scen.expectedRisk === 'HIGH';
               return (
-                <li key={scen.id}>
+                <li key={scen.id} className="relative">
                   <button
                     type="button"
                     onClick={() => startScenario(scen)}
-                    className={`w-full text-left rounded-[18px] px-4 py-3.5 transition-all border active:scale-[0.99] ${
+                    aria-label={`Ring me: ${scen.title}`}
+                    className={`w-full text-left rounded-[18px] px-4 pt-3.5 pb-12 transition-all border active:scale-[0.99] ${
                       isSelected ? 'bg-accent-soft border-accent' : 'bg-surface border-transparent hover:border-line hover:bg-card'
                     }`}
                   >
@@ -196,15 +249,30 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, onCallSt
                         {danger ? stripEmoji(scen.badge) : 'Ordinary call'}
                       </span>
                     </span>
-                    <span className="block text-[13px] text-faint line-clamp-2 mb-2">{scen.explanation}</span>
-                    <span className="flex items-center justify-between text-[12px]">
-                      <span className="text-muted font-semibold">{scen.language}</span>
-                      <span className="inline-flex items-center gap-1 font-bold text-accent">
+                    <span className="block text-[13px] text-faint line-clamp-2">{scen.explanation}</span>
+                  </button>
+                  <span className="absolute left-4 right-3 bottom-2.5 flex items-center justify-between gap-2 text-[12px] pointer-events-none">
+                    <span className="text-muted font-semibold">{scen.language}</span>
+                    <span className="flex items-center gap-1 pointer-events-auto">
+                      {onCheckAsText && (
+                        <button
+                          type="button"
+                          onClick={() => onCheckAsText(scen.transcript)}
+                          className="px-2.5 min-h-8 rounded-full font-bold text-muted hover:text-ink hover:bg-card"
+                        >
+                          Check the words
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => startScenario(scen)}
+                        className="inline-flex items-center gap-1 px-2.5 min-h-8 rounded-full font-bold text-accent hover:bg-card"
+                      >
                         <Play className="w-3 h-3 fill-current" />
                         Ring me
-                      </span>
+                      </button>
                     </span>
-                  </button>
+                  </span>
                 </li>
               );
             })}
@@ -374,6 +442,11 @@ export default function PhoneCallMockup({ onAnalyzeSegment, activeRisk, onCallSt
             )}
           </div>
         </div>
+        {afterCall && (
+          <p className="sb-rise rounded-[18px] bg-tert text-on-tert px-4 py-3 text-[14px] font-semibold max-w-[390px] w-full">
+            If you shared a code or made a payment, call your bank on the number on your card, or dial 1930.
+          </p>
+        )}
         <p className="text-[12px] text-faint text-center max-w-[390px]">
           A web page can’t hang up a real phone call. This one is a demo; on a real call, hang up from your phone.
         </p>

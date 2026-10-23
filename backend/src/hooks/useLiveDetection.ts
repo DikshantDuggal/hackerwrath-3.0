@@ -7,6 +7,35 @@ export interface TranscriptSegment {
   speaker: string;
 }
 
+export interface RetrievedExample {
+  example_id: string;
+  label: 'SCAM' | 'LEGITIMATE';
+  similarity: number;
+  distance: number;
+  text: string;
+}
+
+export interface RAGClassificationResponse {
+  classification: 'SCAM' | 'LEGITIMATE' | 'UNCERTAIN';
+  risk_score: number;
+  confidence: number;
+  insufficient_evidence: boolean;
+  indicators: string[];
+  retrieved_examples: RetrievedExample[];
+  explanation: string;
+  retrieval_latency_ms: number;
+  classification_latency_ms: number;
+}
+
+export interface RAGHealthResponse {
+  status: string;
+  embedding_model: string;
+  embedding_model_loaded: boolean;
+  vector_index_loaded: boolean;
+  indexed_documents_count: number;
+  vector_store_type: string;
+}
+
 export interface RiskAssessment {
   risk_score: number;
   risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNKNOWN';
@@ -19,6 +48,7 @@ export interface RiskAssessment {
     indicator: string;
   }>;
   recommended_action: string;
+  rag_classification?: RAGClassificationResponse | null;
   rule_analysis: {
     rule_score: number;
     triggered_indicators: Array<{

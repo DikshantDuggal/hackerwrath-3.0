@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import type { RAGHealthResponse } from '../hooks/useLiveDetection';
+import { fetchRagHealth } from '../spell/rag';
 
 interface TelegramStatus {
   configured: boolean;
@@ -25,10 +27,12 @@ interface HealthStatus {
 export default function StatusBar() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [telegram, setTelegram] = useState<TelegramStatus | null>(null);
+  const [ragHealth, setRagHealth] = useState<RAGHealthResponse | null>(null);
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
     async function checkHealth() {
+      fetchRagHealth().then(setRagHealth);
       try {
         const [healthRes, tgRes] = await Promise.allSettled([
           fetch('/health', { signal: AbortSignal.timeout(3000) }),
@@ -70,8 +74,16 @@ export default function StatusBar() {
       <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
         <span className="flex items-center gap-1.5 font-semibold">
           <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-accent' : 'bg-danger'}`} />
-          <span className={isOnline ? 'text-ink' : 'text-danger'}>{isOnline ? 'Detector connected' : 'Detector offline'}</span>
+          <span className={isOnline ? 'text-ink' : 'text-danger-text'}>{isOnline ? 'Detector connected' : 'Detector offline'}</span>
         </span>
+        {ragHealth && (
+          <span className="flex items-center gap-1.5 font-semibold">
+            <span className={`w-2 h-2 rounded-full ${ragHealth.vector_index_loaded ? 'bg-accent' : 'bg-warn'}`} />
+            {ragHealth.vector_index_loaded
+              ? `Real-call library: ${ragHealth.indexed_documents_count.toLocaleString()} calls`
+              : 'Real-call library: not loaded'}
+          </span>
+        )}
         {health && (
           <span className="flex items-center gap-1.5 font-semibold">
             <span className={`w-2 h-2 rounded-full ${health.sarvam_configured ? 'bg-accent' : 'bg-warn'}`} />
