@@ -72,6 +72,7 @@ class RiskScorer:
         deepfake_result: Optional[DeepfakeAnalysisResult] = None,
         sync_status: Optional[Dict[str, Any]] = None,
         rag_result: Optional[Dict[str, Any]] = None,
+        icfd_result: Optional[Dict[str, Any]] = None,
     ) -> ScamRiskAssessment:
         reasons: List[str] = []
         evidence: List[EvidenceItem] = []
@@ -88,6 +89,22 @@ class RiskScorer:
                     indicator=ind.keyword_or_pattern,
                 )
             )
+
+        # Collect ICFD trained model evidence
+        if icfd_result and isinstance(icfd_result, dict) and icfd_result.get('available'):
+            if icfd_result.get('is_fraud'):
+                prob = icfd_result.get('fraud_probability', 0.0)
+                lang = icfd_result.get('detected_language', 'unknown')
+                reasons.append(f"[ICFD Model] Flagged as fraudulent with {prob * 100:.1f}% calibrated risk ({lang}).")
+                evidence.append(
+                    EvidenceItem(
+                        excerpt=f"ICFD-31k multilingual model calibrated fraud probability: {prob:.2f}",
+                        start_seconds=start_seconds,
+                        end_seconds=end_seconds,
+                        source="icfd_classifier",
+                        indicator=f"P(fraud)={prob:.2f}",
+                    )
+                )
 
         # Collect RAG semantic evidence
         if rag_result and isinstance(rag_result, dict):
@@ -153,6 +170,7 @@ class RiskScorer:
                 recommended_action=alert.safe_action,
                 rule_analysis=rule_result,
                 contextual_analysis=contextual_result,
+                icfd_analysis=icfd_result,
                 deepfake_analysis=deepfake_result,
                 alert=alert,
                 synchronization_status=sync_status or {"working": True},
@@ -180,6 +198,7 @@ class RiskScorer:
                 recommended_action=alert.safe_action,
                 rule_analysis=rule_result,
                 contextual_analysis=contextual_result,
+                icfd_analysis=icfd_result,
                 deepfake_analysis=deepfake_result,
                 alert=alert,
                 synchronization_status=sync_status or {"working": True},
@@ -204,6 +223,7 @@ class RiskScorer:
                 recommended_action=alert.safe_action,
                 rule_analysis=rule_result,
                 contextual_analysis=contextual_result,
+                icfd_analysis=icfd_result,
                 deepfake_analysis=deepfake_result,
                 alert=alert,
                 synchronization_status=sync_status or {"working": True},
@@ -279,6 +299,7 @@ class RiskScorer:
             rule_analysis=rule_result,
             contextual_analysis=contextual_result,
             rag_analysis=rag_result,
+            icfd_analysis=icfd_result,
             deepfake_analysis=deepfake_result,
             alert=alert,
             synchronization_status=sync_status or {"working": True},

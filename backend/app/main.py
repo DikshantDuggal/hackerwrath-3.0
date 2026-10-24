@@ -5,6 +5,14 @@ Run locally in VS Code / Google Antigravity with:
 """
 from __future__ import annotations
 
+import sys
+if sys.platform == "win32":
+    import asyncio
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
+
 from pathlib import Path
 from app.api.routes_analysis import router as analysis_router
 from app.api.routes_calls import router as calls_router

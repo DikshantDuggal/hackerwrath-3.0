@@ -102,7 +102,7 @@ class EvidenceItem(BaseModel):
     excerpt: str
     start_seconds: Optional[float] = None
     end_seconds: Optional[float] = None
-    source: Literal["rule_engine", "contextual_ai", "cross_call_sync", "rag_retrieval"] = "rule_engine"
+    source: Literal["rule_engine", "contextual_ai", "cross_call_sync", "rag_retrieval", "icfd_classifier"] = "rule_engine"
     indicator: str = ""
 
 
@@ -146,6 +146,7 @@ class ScamRiskAssessment(BaseModel):
         default_factory=ContextualAnalysisOutput
     )
     rag_analysis: Optional[Dict[str, Any]] = None
+    icfd_analysis: Optional[Dict[str, Any]] = None
     deepfake_analysis: Optional[DeepfakeAnalysisResult] = None
     alert: Optional[AlertPayload] = None
     synchronization_status: Dict[str, Any] = Field(default_factory=dict)

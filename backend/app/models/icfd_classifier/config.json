@@ -1,0 +1,17 @@
+{
+  "model_name": "ICFD-31k Production Calibrated Classifier",
+  "selected_architecture": "Calibrated Logistic Regression (L2, C=2.0)",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_dimension": 384,
+  "decision_threshold": 0.5,
+  "random_seed": 42,
+  "label_mapping": {
+    "0": "LEGITIMATE",
+    "1": "FRAUD"
+  },
+  "training_date": "2026-10-23 13:35:20",
+  "training_samples": 7000,
+  "validation_samples": 4500,
+  "test_samples": 4500,
+  "cross_domain_samples": 1000
+}

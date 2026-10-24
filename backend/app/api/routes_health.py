@@ -1,9 +1,10 @@
-"""GET /health endpoint reporting backend and module readiness."""
+"""GET /health and GET /health/ready endpoints reporting backend and module readiness."""
 from __future__ import annotations
 
 from typing import Any, Dict
 from app.core.compat import APIRouter
 from app.core.config import get_settings
+from app.detectors.icfd_classifier import get_icfd_classifier
 from app.services.keyword_sync_service import get_keyword_sync_service
 
 router = APIRouter(tags=["health"])
@@ -13,6 +14,7 @@ router = APIRouter(tags=["health"])
 async def health_check() -> Dict[str, Any]:
     settings = get_settings()
     sync_service = get_keyword_sync_service()
+    icfd_clf = get_icfd_classifier()
     return {
         "status": "ok",
         "working": True,
@@ -40,6 +42,11 @@ async def health_check() -> Dict[str, Any]:
                 "working": True,
                 "calibrated_p_scam_enabled": settings.calibrated_probability_enabled,
             },
+            "icfd_model": {
+                "working": icfd_clf.available,
+                "model_name": icfd_clf.config.get("model_name", "ICFD-31k Production Calibrated Classifier"),
+                "threshold": icfd_clf.threshold,
+            },
             "conversation_state": {
                 "working": True,
                 "retention_seconds": settings.call_state_retention_seconds,
@@ -52,4 +59,29 @@ async def health_check() -> Dict[str, Any]:
                 "threshold": settings.telegram_alert_threshold,
             },
         },
+    }
+
+
+@router.get("/health/ready")
+@router.get("/ready")
+async def readiness_check() -> Dict[str, Any]:
+    settings = get_settings()
+    icfd_clf = get_icfd_classifier()
+    sync_service = get_keyword_sync_service()
+    
+    return {
+        "status": "ready",
+        "ready": True,
+        "service": settings.app_name,
+        "version": settings.app_version,
+        "model_loaded": icfd_clf.available,
+        "icfd_classifier": {
+            "available": icfd_clf.available,
+            "architecture": icfd_clf.config.get("selected_architecture", "Calibrated Logistic Regression (L2)"),
+            "threshold": icfd_clf.threshold,
+        },
+        "rule_engine_ready": True,
+        "active_rules_count": len(settings.rule_weights),
+        "synced_keywords_count": len(sync_service.get_active_keywords()),
+        "sarvam_stt_configured": settings.has_live_sarvam_key,
     }

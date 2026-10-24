@@ -47,6 +47,7 @@ class ConversationManager:
         keyword_sync_service: Optional[KeywordSyncService] = None,
         telegram_service: Optional[TelegramAlertService] = None,
         rag_service: Optional[Any] = None,
+        icfd_classifier: Optional[Any] = None,
         settings: Optional[Settings] = None,
     ) -> None:
         self.settings = settings or get_settings()
@@ -61,6 +62,16 @@ class ConversationManager:
         self.risk_scorer = risk_scorer or RiskScorer(settings=self.settings)
         self.telegram_service = telegram_service or get_telegram_service()
         self.rag_service = rag_service
+        self.icfd_classifier = icfd_classifier
+
+    def _get_icfd_classifier(self) -> Optional[Any]:
+        if self.icfd_classifier is None:
+            try:
+                from app.detectors.icfd_classifier import get_icfd_classifier
+                self.icfd_classifier = get_icfd_classifier()
+            except Exception as exc:
+                logger.debug("ICFD classifier not loaded: %s", exc)
+        return self.icfd_classifier
 
     def _get_rag_service(self) -> Optional[Any]:
         if self.rag_service is None and getattr(self.settings, "enable_live_rag", False):
@@ -93,6 +104,15 @@ class ConversationManager:
             except Exception as rag_err:
                 logger.debug("RAG classification skipped on standalone transcript: %s", rag_err)
 
+        icfd_result_dict = None
+        icfd_clf = self._get_icfd_classifier()
+        if icfd_clf and icfd_clf.available:
+            try:
+                icfd_resp = icfd_clf.predict(request.transcript)
+                icfd_result_dict = icfd_resp.model_dump()
+            except Exception as icfd_err:
+                logger.debug("ICFD prediction skipped: %s", icfd_err)
+
         assessment = self.risk_scorer.score(
             rule_result=rule_res,
             contextual_result=ctx_res,
@@ -101,6 +121,7 @@ class ConversationManager:
             end_seconds=request.end_seconds,
             sync_status=self.keyword_sync.get_sync_status(),
             rag_result=rag_result_dict,
+            icfd_result=icfd_result_dict,
         )
         if request.call_id and self.telegram_service.is_enabled:
             try:
