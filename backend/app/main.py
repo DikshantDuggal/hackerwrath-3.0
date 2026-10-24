@@ -38,6 +38,18 @@ def create_app() -> FastAPI:
         ),
     )
 
+    try:
+        from fastapi.middleware.cors import CORSMiddleware
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    except Exception:
+        pass
+
     application.include_router(health_router)
     application.include_router(transcription_router)
     application.include_router(analysis_router)
