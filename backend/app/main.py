@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
             "Backend-only AI-powered multilingual scam-call detection system "
             "combining Sarvam AI Saaras STT, negation-aware Rule-Based Engine, "
             "Contextual AI Director, Cross-Call Keyword Synchronization, "
-            "Optional Telegram Alerts, and Calibrated Risk Scoring."
+            "Telegram Audio Bridge & Ingestion Gateway, and Calibrated Risk Scoring."
         ),
     )
 
