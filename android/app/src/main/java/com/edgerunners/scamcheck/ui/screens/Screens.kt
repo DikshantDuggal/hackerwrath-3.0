@@ -96,6 +96,13 @@ fun SignInScreen(state: AppUiState, onSignIn: (String, String) -> Unit) {
                 background = if (ready) c.accent else c.off,
                 content = if (ready) c.onAccent else c.faint,
             )
+            SpellButton(
+                "Enter Demo Mode (Offline)",
+                { onSignIn("demo-user", "demo") },
+                Modifier.fillMaxWidth(),
+                background = c.card,
+                content = c.ink,
+            )
             Body(stringResource(R.string.signin_server, BuildConfig.API_BASE_URL), 13.sp, color = c.faint)
         }
     }

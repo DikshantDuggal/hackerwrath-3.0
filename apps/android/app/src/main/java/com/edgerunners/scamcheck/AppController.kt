@@ -22,6 +22,9 @@ import com.edgerunners.scamcheck.call.CallService
 import com.edgerunners.scamcheck.call.TwilioCallController
 import com.edgerunners.scamcheck.call.VoiceCallEvent
 import com.edgerunners.scamcheck.data.ApiClient
+import com.edgerunners.scamcheck.data.AppEvent
+import com.edgerunners.scamcheck.model.RiskLevel
+import com.edgerunners.scamcheck.model.ThreatSignal
 import com.edgerunners.scamcheck.data.ApiException
 import com.edgerunners.scamcheck.data.EventsSocket
 import com.edgerunners.scamcheck.data.SessionStore
@@ -199,7 +202,7 @@ class AppController(
 
     // ---- Calls ----
 
-    /** DEMO-FAKE: asks the backend to play a scripted call. */
+    /** DEMO-FAKE: asks the backend to play a scripted call, or runs locally if offline. */
     fun startDemoCall(scenario: DemoScenario) {
         val token = session.token ?: return
         _state.update { it.copy(demoFailed = false) }
@@ -207,7 +210,113 @@ class AppController(
             try {
                 api.demoCall(token, scenario.wire) // call_started arrives over the WebSocket
             } catch (e: Exception) {
-                _state.update { it.copy(demoFailed = true) }
+                // If backend is unreachable or offline, run simulated demo call locally
+                runLocalDemoCall(scenario)
+            }
+        }
+    }
+
+    private fun runLocalDemoCall(scenario: DemoScenario) {
+        scope.launch {
+            val callId = "demo_call_${System.currentTimeMillis()}"
+            val fromNumber = when (scenario) {
+                DemoScenario.Otp -> "+91 98765 43210 (Bank Support)"
+                DemoScenario.QrScan -> "+91 98111 22334 (Electricity Dept)"
+                DemoScenario.Harmless -> "+91 94123 55678 (Mom)"
+                DemoScenario.Unavailable -> "+91 90000 00000"
+            }
+            reduce { AlertReducer.onEvent(it, AppEvent.CallStarted(callId, 1, fromNumber, demo = true), clock()) }
+
+            if (scenario == DemoScenario.Unavailable) {
+                delay(2000)
+                reduce { AlertReducer.onEvent(it, AppEvent.Status(callId, 2, "unavailable", "Network unavailable"), clock()) }
+                return@launch
+            }
+
+            // Ring for 2.5 seconds, then auto-answer if not answered yet
+            delay(2500)
+            if (_state.value.call.phase == CallPhase.Ringing) {
+                answer()
+            }
+
+            when (scenario) {
+                DemoScenario.Otp -> {
+                    delay(2500)
+                    reduce {
+                        AlertReducer.onEvent(
+                            it,
+                            AppEvent.FirstWarning(
+                                callId = callId,
+                                seq = 2,
+                                revision = 1,
+                                alertId = "alert_otp_1",
+                                requestType = RequestType.OtpShare,
+                                signals = listOf(ThreatSignal.OtpOrPinRequest)
+                            ),
+                            clock()
+                        )
+                    }
+                    delay(3000)
+                    reduce {
+                        AlertReducer.onEvent(
+                            it,
+                            AppEvent.Confirmed(
+                                callId = callId,
+                                seq = 3,
+                                revision = 2,
+                                alertId = "alert_otp_1",
+                                requestType = RequestType.OtpShare,
+                                level = RiskLevel.High,
+                                signals = listOf(ThreatSignal.OtpOrPinRequest, ThreatSignal.AuthorityImpersonation)
+                            ),
+                            clock()
+                        )
+                    }
+                }
+                DemoScenario.QrScan -> {
+                    delay(2500)
+                    reduce {
+                        AlertReducer.onEvent(
+                            it,
+                            AppEvent.FirstWarning(
+                                callId = callId,
+                                seq = 2,
+                                revision = 1,
+                                alertId = "alert_qr_1",
+                                requestType = RequestType.QrReceive,
+                                signals = listOf(ThreatSignal.FinancialSolicitation)
+                            ),
+                            clock()
+                        )
+                    }
+                    delay(3000)
+                    reduce {
+                        AlertReducer.onEvent(
+                            it,
+                            AppEvent.Confirmed(
+                                callId = callId,
+                                seq = 3,
+                                revision = 2,
+                                alertId = "alert_qr_1",
+                                requestType = RequestType.QrReceive,
+                                level = RiskLevel.High,
+                                signals = listOf(ThreatSignal.FinancialSolicitation, ThreatSignal.RemoteAccess)
+                            ),
+                            clock()
+                        )
+                    }
+                }
+                DemoScenario.Harmless -> {
+                    delay(2000)
+                    reduce {
+                        AlertReducer.onEvent(
+                            it,
+                            AppEvent.Status(callId, 2, "monitoring", null),
+                            clock()
+                        )
+                    }
+                }
+                else -> Unit
             }
         }
     }

@@ -46,6 +46,24 @@ def create_app() -> FastAPI:
     application.include_router(live_ingest_router)
     application.include_router(rag_router)
 
+    # Demo Authentication & Settings endpoints for Android mobile app
+    @application.post("/api/login")
+    async def api_login(payload: dict = None):
+        user = (payload or {}).get("username", "demo-user")
+        return {"app_token": "demo_app_token_jwt", "user_id": f"u_{user}"}
+
+    @application.get("/api/settings")
+    async def api_get_settings():
+        return {"scam_check": True, "lang": "hi", "role_context": "expecting_payment"}
+
+    @application.put("/api/settings")
+    async def api_put_settings(payload: dict = None):
+        return payload or {"scam_check": True, "lang": "hi", "role_context": "expecting_payment"}
+
+    @application.post("/api/voice-token")
+    async def api_voice_token():
+        return {"voice_token": "demo_voice_token", "identity": "u_demo"}
+
     # Mount compiled frontend dist if available so http://127.0.0.1:8000 serves the UI directly
     dist_dir = Path(__file__).resolve().parent.parent / "dist"
     assets_dir = dist_dir / "assets"
