@@ -370,8 +370,8 @@ python scripts/test_query.py # launches interactive mode
 # 5. Run benchmark evaluation on isolated test set
 python scripts/evaluate_model.py --sample-limit 100
 
-# 6. Run automated test suite (53 tests)
-python -m unittest discover tests
+# 6. Run automated test suite (81 tests)
+python -m unittest tests.test_backend tests.test_context_aware_detection tests.test_icfd_integration tests.test_telegram_bridge_ingest tests.test_rag_api tests.test_rag_classifier tests.test_rag_preprocessing tests.test_rag_retrieval
 ```
 
 ---
