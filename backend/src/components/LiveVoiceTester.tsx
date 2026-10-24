@@ -54,7 +54,7 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [statusText, setStatusText] = useState('Put the call on speaker and tap the shield.');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [callId] = useState(() => `mic-live-${Date.now().toString(36)}`);
+  const [callId, setCallId] = useState(() => `mic-live-${Date.now().toString(36)}`);
   const [audioLevel, setAudioLevel] = useState(0);
   const [storedUtterances, setStoredUtterances] = useState<StoredUtterance[]>([]);
   const [liveTranscriptPreview, setLiveTranscriptPreview] = useState('');
@@ -134,8 +134,11 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
     ) => {
       if (!text.trim()) return;
 
+      // Use isolated call ID for presets so preset tests never contaminate each other
+      const targetCallId = source === 'preset' ? `preset-test-${Date.now().toString(36)}` : callId;
+
       try {
-        const res = await fetch(`/calls/${callId}/segments`, {
+        const res = await fetch(`/calls/${targetCallId}/segments`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -150,44 +153,46 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
 
         if (res.ok) {
           const update = await res.json();
-          const assessment: RiskAssessment = update.assessment;
-          if (assessment) {
+          // Use segment_assessment for this specific utterance card
+          const segAssessment: RiskAssessment = update.segment_assessment || update.assessment;
+          const cumAssessment: RiskAssessment = update.cumulative_assessment || update.assessment;
+          if (segAssessment) {
             // Nearest real dialogues from the RAG store, shown under "Sounds like".
-            assessment.rag_classification = await fetchRag(text.trim());
-            onAssessmentUpdate(assessment);
+            cumAssessment.rag_classification = await fetchRag(text.trim());
+            onAssessmentUpdate(cumAssessment);
 
-            const keywords = (assessment.rule_analysis?.triggered_indicators || []).map(
+            const keywords = (segAssessment.rule_analysis?.triggered_indicators || []).map(
               (i: any) => i.keyword_or_pattern
             );
 
-            // Add to temporary speech history
+            // Add to temporary speech history with segment-specific assessment
             const newUtterance: StoredUtterance = {
               id: `utt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
               text: text.trim(),
               timestamp: Date.now(),
               speaker: 'caller',
               language: languageCode,
-              riskLevel: assessment.risk_level,
-              riskScore: assessment.risk_score,
+              riskLevel: segAssessment.risk_level,
+              riskScore: segAssessment.risk_score,
               flaggedKeywords: keywords,
-              safeAction: assessment.recommended_action,
+              safeAction: segAssessment.recommended_action,
               source,
             };
 
             setStoredUtterances((prev) => [newUtterance, ...prev]);
 
-            // Audio Alert
-            if (assessment.risk_level === 'HIGH' || assessment.risk_level === 'CRITICAL') {
+            // Audio Alert based on overall call posture
+            if (cumAssessment.risk_level === 'HIGH' || cumAssessment.risk_level === 'CRITICAL') {
               audioAlerts.playHighRiskAlert();
-            } else if (assessment.risk_level === 'MEDIUM') {
+            } else if (cumAssessment.risk_level === 'MEDIUM') {
               audioAlerts.playCautionAlert();
             } else {
               audioAlerts.playSafeChime();
             }
 
             setStatusText(
-              `Analyzed: "${text.slice(0, 35)}..." → ${assessment.risk_level} (${Math.round(
-                assessment.risk_score
+              `Analyzed: "${text.slice(0, 35)}..." → ${segAssessment.risk_level} (${Math.round(
+                segAssessment.risk_score
               )}/100)`
             );
           }
@@ -272,9 +277,17 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
               source: data.source || (captureMode === 'dual' && systemStream ? 'dual_capture' : 'microphone'),
             };
 
-            setStoredUtterances((prev) => [newUtterance, ...prev]);
+            setStoredUtterances((prev) => {
+              // Deduplicate identical chunks arriving in close proximity
+              if (prev.length > 0 && prev[0].text === textChunk && Math.abs(prev[0].timestamp - newUtterance.timestamp) < 500) {
+                return prev;
+              }
+              return [newUtterance, ...prev];
+            });
 
             if (onAssessmentUpdate) {
+              const displayRiskScore = data.callRiskScore !== undefined ? data.callRiskScore : data.riskScore;
+              const displayRiskLevel = data.callRiskLevel || data.riskLevel;
               const triggered = (data.flaggedKeywords || []).map((k: string) => ({
                 indicator_name: k,
                 keyword_or_pattern: k,
@@ -284,8 +297,8 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
               }));
 
               onAssessmentUpdate({
-                risk_score: data.riskScore ?? 0,
-                risk_level: data.riskLevel ?? 'LOW',
+                risk_score: displayRiskScore ?? 0,
+                risk_level: displayRiskLevel ?? 'LOW',
                 caption: data.text || textChunk,
                 reasons: (data.flaggedKeywords && data.flaggedKeywords.length > 0)
                   ? data.flaggedKeywords.map((k: string) => `Flagged indicator: ${k}`)
@@ -294,15 +307,15 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
                 confidence: 0.94,
                 evidence: data.flaggedKeywords || [],
                 rule_analysis: {
-                  rule_score: data.riskScore ?? 0,
+                  rule_score: displayRiskScore ?? 0,
                   triggered_indicators: triggered,
                   suppressed_protective_matches: [],
                 },
                 contextual_analysis: {
                   caller_identity_claim: 'Call Participant',
                   claimed_organisation: 'Unknown',
-                  intent_classification: (data.riskLevel === 'CRITICAL' || data.riskLevel === 'HIGH') ? 'Suspicious Solicitation' : 'General Speech',
-                  possible_impersonation: Boolean(data.riskLevel === 'CRITICAL' || data.riskLevel === 'HIGH'),
+                  intent_classification: (displayRiskLevel === 'CRITICAL' || displayRiskLevel === 'HIGH') ? 'Suspicious Solicitation' : 'General Speech',
+                  possible_impersonation: Boolean(displayRiskLevel === 'CRITICAL' || displayRiskLevel === 'HIGH'),
                 },
               } as any);
             }
@@ -692,7 +705,11 @@ const LiveVoiceTester = forwardRef<LiveVoiceHandle, LiveVoiceTesterProps>(functi
           {storedUtterances.length > 0 && (
             <button
               type="button"
-              onClick={() => setStoredUtterances([])}
+              onClick={() => {
+                setStoredUtterances([]);
+                setCallId(`mic-live-${Date.now().toString(36)}`);
+                onAssessmentUpdate(null);
+              }}
               className="text-[12px] font-semibold text-faint hover:text-ink flex items-center gap-1"
             >
               <Trash2 className="w-3.5 h-3.5" />

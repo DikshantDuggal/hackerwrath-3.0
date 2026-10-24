@@ -120,6 +120,13 @@ class RAGScamClassifier:
         is_auth_notice = bool(INBOUND_AUTH_NOTIFICATION_RE.search(raw_text)) and not is_protective
         is_active_solicitation = bool(ACTIVE_SOLICITATION_RE.search(raw_text))
         is_coercion = bool(COERCION_URGENCY_RE.search(raw_text))
+        
+        # Fast-path for harmless conversational greetings, fillers, and isolated tokens
+        benign_greeting_pattern = (
+            r"^(?:hello|hi|hey|hmm|okay|ok|b\.?sc\.?|yes|no|thanks|thank you|"
+            r"haan|haanji|haaji|theek hai|accha|achha|namaste|namaskar|sat sri akal|sasriakal|bolo|kya haal hai)[.!?\s]*$"
+        )
+        is_greeting = bool(re.match(benign_greeting_pattern, cleaned_query.strip(), re.IGNORECASE))
 
         # 5. Semantic Evidence Weighting from Retrieved Neighbors
         scam_sim_sum = 0.0
@@ -147,8 +154,18 @@ class RAGScamClassifier:
         rag_scam_ratio = (scam_sim_sum / total_sim) if total_sim > 0 else 0.5
 
         # 6. Synthesize Classification Verdict
+        # Case 0: Common conversational greeting or polite filler
+        if is_greeting and not is_active_solicitation and not is_coercion:
+            classification = "LEGITIMATE"
+            risk_score = 0.0
+            confidence = 0.95
+            indicators.append("Standard conversational greeting or acknowledgement")
+            explanation_parts.append(
+                "Standard conversational greeting or acknowledgement without suspicious or coercive elements."
+            )
+
         # Case A: Explicit Protective Advice ("Never share your OTP...")
-        if is_protective:
+        elif is_protective:
             classification = "LEGITIMATE"
             risk_score = 0.0
             confidence = 0.95
@@ -187,7 +204,7 @@ class RAGScamClassifier:
         # Case D: Insufficient Evidence or Weak Semantic Match
         elif insufficient_evidence or (not retrieved_examples):
             classification = "UNCERTAIN"
-            risk_score = 25.0
+            risk_score = 0.0 if len(cleaned_query.split()) <= 2 else 25.0
             confidence = 0.35
             indicators.append("Weak semantic retrieval evidence from reference fraud corpus")
             explanation_parts.append(

@@ -351,12 +351,8 @@ async def websocket_browser_stream(
     broadcaster = get_broadcaster()
     broadcaster.register(websocket)
 
-    async def forward_to_browser(event: Dict[str, Any]) -> None:
-        try:
-            await websocket.send_json(event)
-        except Exception:
-            pass
-
+    # Note: websocket is registered with broadcaster, so on_event_callback is omitted
+    # to eliminate duplicate deliveries with identical timestamps.
     session = LiveAudioSession(
         call_id=call_id,
         stt_provider=stt_provider,
@@ -364,7 +360,7 @@ async def websocket_browser_stream(
         telegram_service=telegram_service,
         broadcaster=broadcaster,
         language_code="auto",
-        on_event_callback=forward_to_browser,
+        on_event_callback=None,
     )
     session.start()
 

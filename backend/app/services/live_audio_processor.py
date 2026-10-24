@@ -406,12 +406,16 @@ class LiveAudioSession:
             )
 
             seg_res = self.conversation_manager.process_segment(self.call_id, seg_req)
-            assessment = seg_res.assessment
+            # Decouple segment-level assessment (isolated utterance) from cumulative call posture
+            seg_assessment = seg_res.segment_assessment or seg_res.assessment
+            cum_assessment = seg_res.cumulative_assessment or seg_res.assessment
 
             # Extract retrieval similarity if RAG was run
             retrieval_sim = None
-            if assessment.rag_analysis and isinstance(assessment.rag_analysis, dict):
-                retrieval_sim = assessment.rag_analysis.get("retrieval_similarity")
+            if seg_assessment.rag_analysis and isinstance(seg_assessment.rag_analysis, dict):
+                retrieval_sim = seg_assessment.rag_analysis.get("retrieval_similarity")
+            elif cum_assessment.rag_analysis and isinstance(cum_assessment.rag_analysis, dict):
+                retrieval_sim = cum_assessment.rag_analysis.get("retrieval_similarity")
 
             # Emit progressive caption chunks
             for idx, w_chunk in enumerate(word_chunks):
@@ -429,20 +433,26 @@ class LiveAudioSession:
                     "isPartial": not is_last_in_slice and not is_final,
                     "isFinal": is_final and is_last_in_slice,
                     "language": stt_res.language_code,
-                    "riskScore": assessment.risk_score,
-                    "riskLevel": assessment.risk_level,
-                    "confidence": assessment.confidence,
+                    "riskScore": seg_assessment.risk_score,
+                    "riskLevel": seg_assessment.risk_level,
+                    "confidence": seg_assessment.confidence,
                     "transcriptConfidence": stt_res.confidence,
                     "retrievalSimilarity": retrieval_sim,
                     "flaggedKeywords": [
-                        i.keyword_or_pattern for i in assessment.rule_analysis.triggered_indicators
+                        i.keyword_or_pattern for i in seg_assessment.rule_analysis.triggered_indicators
                     ],
-                    "recommendedAction": assessment.recommended_action,
+                    "recommendedAction": seg_assessment.recommended_action,
+                    "callRiskScore": cum_assessment.risk_score,
+                    "callRiskLevel": cum_assessment.risk_level,
+                    "callHasAlert": cum_assessment.risk_level in ("HIGH", "CRITICAL"),
                     "source": self.source,
                     "timestamp": round(time.time(), 3),
                 }
 
-                # Send to direct callback if provided
+                # Broadcast to connected dashboard sessions without duplicates
+                await self.broadcaster.broadcast(event_payload)
+
+                # Send to direct callback only if provided
                 if self.on_event_callback:
                     try:
                         res = self.on_event_callback(event_payload)
@@ -451,15 +461,12 @@ class LiveAudioSession:
                     except Exception as cb_err:
                         logger.warning("Error in on_event_callback: %s", cb_err)
 
-                # Broadcast to connected dashboard sessions
-                await self.broadcaster.broadcast(event_payload)
-
-            # Check if Telegram alert should be triggered
+            # Check if Telegram alert should be triggered (based on cumulative call state)
             if (
-                assessment.risk_level in ("HIGH", "CRITICAL")
+                cum_assessment.risk_level in ("HIGH", "CRITICAL")
                 and self.telegram_service.is_enabled
             ):
-                alert_res = self.telegram_service.send_risk_alert(assessment, self.call_id)
+                alert_res = self.telegram_service.send_risk_alert(cum_assessment, self.call_id)
                 if alert_res.delivered:
                     alert_event = {
                         "type": "telegram_alert_sent",
@@ -467,8 +474,9 @@ class LiveAudioSession:
                         "channel": ch.channel_id,
                         "speaker": ch.speaker,
                         "messageId": alert_res.message_id,
-                        "riskLevel": assessment.risk_level,
-                        "riskScore": assessment.risk_score,
+                        "riskLevel": cum_assessment.risk_level,
+                        "riskScore": cum_assessment.risk_score,
+                        "timestamp": round(time.time(), 3),
                     }
                     await self.broadcaster.broadcast(alert_event)
 

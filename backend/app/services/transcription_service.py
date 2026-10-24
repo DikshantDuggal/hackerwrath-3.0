@@ -154,7 +154,20 @@ class SarvamSaarasProvider(BaseSpeechToTextProvider):
         # 3. If live SARVAM_API_KEY is configured, call Sarvam REST endpoint
         if self.settings.has_live_sarvam_key:
             return self._call_live_sarvam_api(audio_bytes, filename, language_code)
+
         decoded_text = self._extract_embedded_test_transcript(audio_bytes, language_code)
+        if not decoded_text:
+            return TranscriptionResponse(
+                provider=self.provider_name,
+                model=self.settings.sarvam_stt_model,
+                language_code=language_code,
+                transcript="",
+                confidence=0.0,
+                duration_seconds=round(max(0.0, len(audio_bytes) / 32000.0), 2),
+                segments=[],
+                streaming_ready=True,
+                operational_status="NO_SPEECH_OR_PROVIDER_OFFLINE",
+            )
         est_duration = round(max(1.2, min(60.0, len(audio_bytes) / 32000.0)), 2)
         return TranscriptionResponse(
             provider=self.provider_name,
@@ -244,17 +257,7 @@ class SarvamSaarasProvider(BaseSpeechToTextProvider):
                     return after[:500]
         except Exception:
             pass
-
-        default_samples = {
-            "hi": "भाई मैं आर्मी में हूँ, क्यूआर भेज रहा हूँ, स्कैन करो पेमेंट तुरंत आ जाएगा।",
-            "hi-IN": "भाई मैं आर्मी में हूँ, क्यूआर भेज रहा हूँ, स्कैन करो पेमेंट तुरंत आ जाएगा।",
-            "pa": "ਤੁਹਾਡੇ ਫੋਨ ਤੇ ਓਟੀਪੀ ਆਇਆ ਹੋਣਾ, ਮੈਨੂੰ ਦੱਸੋ ਜਲਦੀ।",
-            "pa-IN": "ਤੁਹਾਡੇ ਫੋਨ ਤੇ ਓਟੀਪੀ ਆਇਆ ਹੋਣਾ, ਮੈਨੂੰ ਦੱਸੋ ਜਲਦੀ।",
-        }
-        return default_samples.get(
-            language_code,
-            "Hello, I am calling regarding your account verification. Please do not share your OTP with anyone.",
-        )
+        return ""
 
     def _call_live_sarvam_api(
         self, audio_bytes: bytes, filename: str, language_code: str

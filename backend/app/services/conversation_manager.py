@@ -157,6 +157,8 @@ class ConversationManager:
                 duplicate_evidence_suppressed=state.total_duplicates_skipped,
                 synced_keywords_triggered=list(state.synced_keywords_hit),
                 assessment=state.latest_assessment,
+                segment_assessment=state.latest_assessment,
+                cumulative_assessment=state.latest_assessment,
             )
 
         # Evaluate new segment against rules engine, passing `state.seen_rule_keys`
@@ -180,7 +182,30 @@ class ConversationManager:
             if skw not in state.synced_keywords_hit:
                 state.synced_keywords_hit.append(skw)
 
-        # Recompute cumulative rule score across all unique indicators in this call (0–100 scale)
+        # 1. Evaluate segment in isolation (Segment-Level Assessment)
+        segment_contextual_result = self.contextual_analyzer.analyze(segment.text)
+
+        rag_result_dict = None
+        rag_svc = self._get_rag_service()
+        if rag_svc and getattr(self.settings, "enable_live_rag", False):
+            try:
+                rag_resp = rag_svc.classify_text(segment.text, top_k=3)
+                rag_result_dict = rag_resp.model_dump()
+            except Exception as rag_err:
+                logger.debug("RAG classification skipped on segment: %s", rag_err)
+
+        segment_assessment = self.risk_scorer.score(
+            rule_result=segment_rule_res,
+            contextual_result=segment_contextual_result,
+            transcript_confidence=segment.transcript_confidence,
+            start_seconds=segment.start_seconds,
+            end_seconds=segment.end_seconds,
+            sync_status=self.keyword_sync.get_sync_status(),
+            rag_result=rag_result_dict,
+            raw_transcript=segment.text,
+        )
+
+        # 2. Recompute cumulative rule score across all unique indicators in this call (0–100 scale)
         if not state.accumulated_indicators:
             cumulative_rule_score = 0.0
         else:
@@ -208,16 +233,7 @@ class ConversationManager:
         if len(state.recent_utterances) > 12:
             state.recent_utterances = state.recent_utterances[-12:]
 
-        rag_result_dict = None
-        rag_svc = self._get_rag_service()
-        if rag_svc and getattr(self.settings, "enable_live_rag", False):
-            try:
-                rag_resp = rag_svc.classify_text(segment.text, top_k=3)
-                rag_result_dict = rag_resp.model_dump()
-            except Exception as rag_err:
-                logger.debug("RAG classification skipped on segment: %s", rag_err)
-
-        assessment = self.risk_scorer.score(
+        cumulative_assessment = self.risk_scorer.score(
             rule_result=cumulative_rule_result,
             contextual_result=contextual_result,
             transcript_confidence=segment.transcript_confidence,
@@ -242,9 +258,9 @@ class ConversationManager:
             detected_indicators=[
                 i.keyword_or_pattern for i in segment_rule_res.triggered_indicators
             ],
-            risk_level_at_segment=assessment.risk_level,
-            risk_score_at_segment=assessment.risk_score,
-            caption_at_segment=assessment.caption,
+            risk_level_at_segment=segment_assessment.risk_level,
+            risk_score_at_segment=segment_assessment.risk_score,
+            caption_at_segment=segment_assessment.caption,
             processed_at=round(time.time(), 3),
         )
 
@@ -252,13 +268,13 @@ class ConversationManager:
         if len(state.segments) > self.settings.max_segments_per_call:
             state.segments = state.segments[-self.settings.max_segments_per_call :]
 
-        state.latest_assessment = assessment
+        state.latest_assessment = cumulative_assessment
         self.repository.save(state)
 
         # Dispatch Telegram notification if enabled and risk threshold reached
         if self.telegram_service.is_enabled:
             try:
-                self.telegram_service.send_risk_alert(assessment, call_id)
+                self.telegram_service.send_risk_alert(cumulative_assessment, call_id)
             except Exception as exc:
                 logger.warning("Telegram notification dispatch error: %s", exc)
 
@@ -268,7 +284,9 @@ class ConversationManager:
             sequence_number=seq_num,
             duplicate_evidence_suppressed=segment_rule_res.duplicate_indicators_skipped,
             synced_keywords_triggered=list(segment_rule_res.synced_keywords_matched),
-            assessment=assessment,
+            assessment=cumulative_assessment,
+            segment_assessment=segment_assessment,
+            cumulative_assessment=cumulative_assessment,
         )
 
     def get_latest_risk(self, call_id: str) -> Optional[ScamRiskAssessment]:

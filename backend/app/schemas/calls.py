@@ -43,7 +43,9 @@ class CallSegmentUpdateResponse(BaseModel):
     sequence_number: int
     duplicate_evidence_suppressed: int = 0
     synced_keywords_triggered: List[str] = Field(default_factory=list)
-    assessment: ScamRiskAssessment
+    assessment: ScamRiskAssessment  # Segment-level assessment for backwards compatibility
+    segment_assessment: Optional[ScamRiskAssessment] = None
+    cumulative_assessment: Optional[ScamRiskAssessment] = None
 
 
 class CallHistoryResponse(BaseModel):
