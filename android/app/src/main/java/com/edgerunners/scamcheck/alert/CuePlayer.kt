@@ -21,17 +21,28 @@ interface MuteControl {
  * Plays cues on this phone only, never into the call: the call is muted while a cue plays
  * and restored to the user's own mute choice afterwards.
  *
- * Spoken clips live in res/raw as warning_<request>_<lang> (for example
- * warning_qr_receive_hi.ogg), recorded by native speakers. Until a clip exists, the chime
- * and vibration carry the warning on their own.
+ * Integrates with AudioDeviceMonitor to respect headset transitions and enforce
+ * acoustic privacy (earpiece routing with attenuated volume when no headphones are attached,
+ * preventing the remote caller from overhearing the alert).
  */
-class CuePlayer(private val context: Context) {
+class CuePlayer(
+    private val context: Context,
+    val audioMonitor: AudioDeviceMonitor? = null
+) {
     private val main = Handler(Looper.getMainLooper())
+
+    fun currentRoute(): AudioRoute = audioMonitor?.state?.value?.route ?: AudioRoute.EARPIECE
+
+    fun isNoHeadphonesMode(): Boolean = audioMonitor?.state?.value?.isNoHeadphonesMode ?: true
 
     fun chime(mute: MuteControl) {
         mute.applyCallMute(true)
+        val noHeadphones = isNoHeadphonesMode()
+        val volume = if (noHeadphones) 50 else 75
+        Log.i(TAG, "Playing chime (route=${currentRoute().displayName}, noHeadphones=$noHeadphones, volume=$volume)")
+
         val tone = try {
-            ToneGenerator(AudioManager.STREAM_VOICE_CALL, 70)
+            ToneGenerator(AudioManager.STREAM_VOICE_CALL, volume)
         } catch (e: RuntimeException) {
             Log.w(TAG, "tone generator unavailable", e)
             mute.applyCallMute(mute.userMuted())
@@ -62,6 +73,12 @@ class CuePlayer(private val context: Context) {
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             )
+
+            val noHeadphones = isNoHeadphonesMode()
+            val vol = if (noHeadphones) 0.45f else 0.85f
+            player.setVolume(vol, vol)
+            Log.i(TAG, "Playing warning audio (route=${currentRoute().displayName}, privacyVolume=$vol)")
+
             player.setOnCompletionListener {
                 it.release()
                 mute.applyCallMute(mute.userMuted())

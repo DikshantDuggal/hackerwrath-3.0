@@ -122,6 +122,7 @@ class ConversationManager:
             sync_status=self.keyword_sync.get_sync_status(),
             rag_result=rag_result_dict,
             icfd_result=icfd_result_dict,
+            raw_transcript=request.transcript,
         )
         if request.call_id and self.telegram_service.is_enabled:
             try:
@@ -224,6 +225,7 @@ class ConversationManager:
             end_seconds=segment.end_seconds,
             sync_status=self.keyword_sync.get_sync_status(),
             rag_result=rag_result_dict,
+            raw_transcript=segment.text,
         )
 
         seq_num = len(state.segments) + 1

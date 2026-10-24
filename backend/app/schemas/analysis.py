@@ -102,7 +102,7 @@ class EvidenceItem(BaseModel):
     excerpt: str
     start_seconds: Optional[float] = None
     end_seconds: Optional[float] = None
-    source: Literal["rule_engine", "contextual_ai", "cross_call_sync", "rag_retrieval", "icfd_classifier"] = "rule_engine"
+    source: Literal["rule_engine", "contextual_ai", "cross_call_sync", "rag_retrieval", "icfd_classifier", "sensitive_detector"] = "rule_engine"
     indicator: str = ""
 
 
@@ -122,7 +122,8 @@ class AlertPayload(BaseModel):
 class ScamRiskAssessment(BaseModel):
     """
     Unified Scam Risk Assessment combining Rule-Based Evidence, Contextual AI Director,
-    Cross-Call Keyword Synchronization, and Optional Deepfake Detection.
+    Cross-Call Keyword Synchronization, Dedicated Sensitive-Information Detection,
+    and Optional Deepfake Detection.
     Uses consistent 0–100 heuristic risk score with thresholds:
       0–29: LOW
       30–59: MEDIUM
@@ -134,13 +135,19 @@ class ScamRiskAssessment(BaseModel):
     risk_score: float = Field(default=0.0, ge=0.0, le=100.0)
     p_scam: Optional[float] = Field(default=None)
     risk_level: RiskLevelType = "LOW"
+    status: str = Field(default="success")
     confidence: Optional[float] = Field(default=0.85, ge=0.0, le=1.0)
     caption: str = Field(default="Normal conversation monitoring")
     reasons: List[str] = Field(default_factory=list)
+    explanation: str = Field(default="")
+    indicators: List[Dict[str, Any]] = Field(default_factory=list)
     evidence: List[EvidenceItem] = Field(default_factory=list)
+    counter_evidence: List[str] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
     recommended_action: str = Field(
         default="Continue with normal caution; never share OTPs, UPI PINs, or passwords on a call."
     )
+    scoring_version: str = Field(default="2.1.0-contextual-aware")
     rule_analysis: RuleEngineResult = Field(default_factory=RuleEngineResult)
     contextual_analysis: ContextualAnalysisOutput = Field(
         default_factory=ContextualAnalysisOutput

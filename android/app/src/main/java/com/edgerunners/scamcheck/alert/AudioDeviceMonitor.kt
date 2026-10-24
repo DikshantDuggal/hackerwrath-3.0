@@ -93,6 +93,10 @@ class AudioDeviceMonitor(private val context: Context) {
         _state.value = computeCurrentState("MONITOR_STARTED")
     }
 
+    fun startMonitoring() = start()
+
+    fun stopMonitoring() = stop()
+
     fun stop() {
         if (!registered) return
         try {

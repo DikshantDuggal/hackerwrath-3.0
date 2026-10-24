@@ -97,8 +97,8 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
 
 
 REGEX_OTP_SOLICITATION = re.compile(
-    r"\b(what is|whats|batao|bata|dasso|das|share|tell|give|enter|send|provide|input|type|confirm|verify|daalo|daal|bhejo|bhej|likho|bolo|read out|boliye|bataiye|need|asking|asking for)\b.*?\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials|login credentials|confidential info|confidential details)\b"
-    r"|\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials)\b.*?\b(batao|bata|dasso|das|share|tell|give|enter|send|provide|daalo|daal|bhejo|bhej|likho|bolo|chahiye|de do|bata do|dass do|verify|confirm|karo|bataiye|needed|required)\b"
+    r"\b(what is|whats|batao|bata|dasso|das|share|tell|give|enter|send|provide|input|type|confirm|verify|daalo|daal|bhejo|bhej|likho|bolo|read out|read(?:\s+\w+)?\s+out|read|boliye|bataiye|need|asking|asking for)\b.*?\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|auth code|authentication code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials|login credentials|confidential info|confidential details)\b"
+    r"|\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|auth code|authentication code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials)\b.*?\b(batao|bata|dasso|das|share|tell|give|enter|send|provide|read out|read(?:\s+\w+)?\s+out|read|daalo|daal|bhejo|bhej|likho|bolo|chahiye|de do|bata do|dass do|verify|confirm|karo|bataiye|needed|required)\b"
     r"|\b(?:asking|demanding|requesting|soliciting)\s+(?:for\s+)?sensitive\s+(?:info|information|details|data|credentials)\b"
     r"|(?:ओटीपी|पिन|पासवर्ड|सीवीवी|संवेदनशील\s+जानकारी|बैंक\s+विवरण).*(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर)|(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर).*(?:ओटीपी|पिन|पासवर्ड|सीवीवी|संवेदनशील\s+जानकारी|बैंक\s+विवरण)"
     r"|(?:ਓਟੀਪੀ|ਪਿੰਨ).*(?:ਦੱਸੋ|ਦੱਸ|ਪਾਓ|ਭੇਜੋ)|(?:ਦੱਸੋ|ਦੱਸ|ਪਾਓ|ਭੇਜੋ).*(?:ਓਟੀਪੀ|ਪਿੰਨ)",
@@ -106,8 +106,8 @@ REGEX_OTP_SOLICITATION = re.compile(
 )
 
 REGEX_ACCOUNT_SUSPENSION = re.compile(
-    r"\b(account|khata|sim|sim card|card|bank account|kyc|electricity|debit card)\b.*?\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band|expired|disconnect|disconnected)\b"
-    r"|\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band)\b.*?\b(account|khata|sim|card|kyc)\b"
+    r"\b(account|khata|sim|sim card|card|bank account|kyc|electricity|debit card|service|connection)\b.*?\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band|expired|disconnect|disconnected)\b"
+    r"|\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band)\b.*?\b(account|khata|sim|card|kyc|service|connection)\b"
     r"|(?:खाता|अकाउंट|सिम|केवाईसी).*(?:बंद|ब्लॉक|सस्पेंड|फ्रीज)|(?:बंद|ब्लॉक|सस्पेंड|फ्रीज).*(?:खाता|अकाउंट|सिम|केवाईसी)"
     r"|(?:ਖਾਤਾ|ਅਕਾਊਂਟ|ਸਿਮ).*(?:ਬੰਦ|ਬਲਾਕ)|(?:ਬੰਦ|ਬਲਾਕ).*(?:ਖਾਤਾ|ਅਕਾਊਂਟ|ਸਿਮ)",
     re.IGNORECASE,
