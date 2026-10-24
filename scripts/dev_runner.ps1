@@ -20,7 +20,7 @@ $AndroidDir = "$RootDir\android"
 $ScriptsDir = "$RootDir\scripts"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "     EdgeRunner Guardian — Unified Dev Runner             " -ForegroundColor Cyan
+Write-Host "     EdgeRunner Guardian - Unified Dev Runner             " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # Set storage environment on D:
@@ -39,19 +39,19 @@ $env:PATH = "D:\edgerunner_tools\HatchZip;D:\android-tools\android-sdk\emulator;
 $PythonExe = "C:\Users\diksh\AppData\Local\Programs\Python\Python311\python.exe"
 
 function Run-Tests {
-    Write-Host "`n>>> [RUNNING BACKEND TEST SUITE] <<<" -ForegroundColor Green
+    Write-Host "`n=== [RUNNING BACKEND TEST SUITE] ===" -ForegroundColor Green
     Set-Location $BackendDir
     & $PythonExe -m unittest discover -s tests -p "test_*.py"
 }
 
 function Build-Android {
-    Write-Host "`n>>> [BUILDING ANDROID DEBUG APK] <<<" -ForegroundColor Green
+    Write-Host "`n=== [BUILDING ANDROID DEBUG APK] ===" -ForegroundColor Green
     Set-Location $AndroidDir
     & ".\gradlew.bat" assembleDebug --no-daemon
 }
 
 function Check-Status {
-    Write-Host "`n>>> [CHECKING COMPONENT HEALTH STATUS] <<<" -ForegroundColor Green
+    Write-Host "`n=== [CHECKING COMPONENT HEALTH STATUS] ===" -ForegroundColor Green
     
     # Check Drive Free Space
     $cDrive = Get-CimInstance Win32_LogicalDisk | Where-Object DeviceID -eq 'C:'
@@ -103,11 +103,8 @@ switch ($Action) {
     }
     "all" {
         Write-Host "`n[Action: ALL] Spawning Backend and Emulator..." -ForegroundColor Green
-        # Start backend in a new separate process window
         Start-Process powershell -ArgumentList "-NoExit", "-File", "$ScriptsDir\start_backend.ps1"
         Start-Sleep -Seconds 3
-
-        # Start emulator
         & "$ScriptsDir\start_emulator.ps1"
     }
 }
