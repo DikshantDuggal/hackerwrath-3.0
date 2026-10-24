@@ -314,6 +314,56 @@ class RiskScorer:
             )
 
         # ---------------------------------------------------------------------
+        # PROTECTIVE / EDUCATIONAL / QUOTED / BENIGN OVERRIDES
+        # ---------------------------------------------------------------------
+        is_protective = (
+            sens_res.is_protective_warning
+            or bool(rule_result.suppressed_protective_matches)
+            or contextual_result.intent_classification == "PROTECTIVE_WARNING"
+        )
+        is_educational = sens_res.is_educational_discussion
+        is_quoted = sens_res.is_quoted_speech
+        is_benign = sens_res.is_benign_notification
+
+        # If purely protective, educational, quoted, or benign notification with no un-negated attack
+        if (is_protective or is_educational or is_quoted or is_benign) and not sens_res.is_solicitation:
+            expl_msg = ""
+            if is_protective:
+                expl_msg = "Protective security advice detected warning never to disclose credentials or sensitive information."
+            elif is_educational:
+                expl_msg = "Educational discussion regarding scam techniques detected without active fraud solicitation."
+            elif is_quoted:
+                expl_msg = "Quoted/reported speech narrating a past caller attempt detected rather than a live attack."
+            elif is_benign:
+                expl_msg = "Standard notification or official self-service instruction detected."
+
+            reasons.append(expl_msg)
+            alert = self.alert_service.build_alert("LOW", 0.0, [])
+            return ScamRiskAssessment(
+                risk_score=0.0,
+                p_scam=self._compute_calibrated_probability(0.0),
+                risk_level="LOW",
+                status="success",
+                confidence=0.92,
+                caption=contextual_result.contextual_caption or "Protective or benign conversation",
+                reasons=reasons,
+                explanation=expl_msg,
+                indicators=indicators,
+                evidence=evidence,
+                counter_evidence=counter_evidence,
+                limitations=limitations,
+                recommended_action=(
+                    "Continue with normal caution. Never share OTPs, UPI PINs, or passwords with anyone on a phone call. Legitimate organizations will never ask for your secret codes."
+                ),
+                rule_analysis=rule_result,
+                contextual_analysis=contextual_result,
+                icfd_analysis=icfd_result,
+                deepfake_analysis=deepfake_result,
+                alert=alert,
+                synchronization_status=sync_status or {"working": True},
+            )
+
+        # ---------------------------------------------------------------------
         # UNKNOWN CONDITION 3: AI service failure (timeout / malformed / unavailable)
         # ---------------------------------------------------------------------
         ai_failed = contextual_result.service_status in (
@@ -389,55 +439,6 @@ class RiskScorer:
                 synchronization_status=sync_status or {"working": True},
             )
 
-        # ---------------------------------------------------------------------
-        # PROTECTIVE / EDUCATIONAL / QUOTED / BENIGN OVERRIDES
-        # ---------------------------------------------------------------------
-        is_protective = (
-            sens_res.is_protective_warning
-            or bool(rule_result.suppressed_protective_matches)
-            or contextual_result.intent_classification == "PROTECTIVE_WARNING"
-        )
-        is_educational = sens_res.is_educational_discussion
-        is_quoted = sens_res.is_quoted_speech
-        is_benign = sens_res.is_benign_notification
-
-        # If purely protective, educational, quoted, or benign notification with no un-negated attack
-        if (is_protective or is_educational or is_quoted or is_benign) and not sens_res.is_solicitation:
-            expl_msg = ""
-            if is_protective:
-                expl_msg = "Protective security advice detected warning never to disclose credentials or sensitive information."
-            elif is_educational:
-                expl_msg = "Educational discussion regarding scam techniques detected without active fraud solicitation."
-            elif is_quoted:
-                expl_msg = "Quoted/reported speech narrating a past caller attempt detected rather than a live attack."
-            elif is_benign:
-                expl_msg = "Standard notification or official self-service instruction detected."
-
-            reasons.append(expl_msg)
-            alert = self.alert_service.build_alert("LOW", 0.0, [])
-            return ScamRiskAssessment(
-                risk_score=0.0,
-                p_scam=self._compute_calibrated_probability(0.0),
-                risk_level="LOW",
-                status="success",
-                confidence=0.92,
-                caption=contextual_result.contextual_caption or "Protective or benign conversation",
-                reasons=reasons,
-                explanation=expl_msg,
-                indicators=indicators,
-                evidence=evidence,
-                counter_evidence=counter_evidence,
-                limitations=limitations,
-                recommended_action=(
-                    "Continue with normal caution. Never share OTPs, UPI PINs, or passwords with anyone on a phone call. Legitimate organizations will never ask for your secret codes."
-                ),
-                rule_analysis=rule_result,
-                contextual_analysis=contextual_result,
-                icfd_analysis=icfd_result,
-                deepfake_analysis=deepfake_result,
-                alert=alert,
-                synchronization_status=sync_status or {"working": True},
-            )
 
         # ---------------------------------------------------------------------
         # SCORING COMBINATION
