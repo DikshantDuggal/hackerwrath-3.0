@@ -42,6 +42,55 @@ data class DemoCallRequest(val scenario: String)
 data class DemoCallResponse(@SerialName("call_id") val callId: String)
 
 @Serializable
+data class CallStartDto(
+    @SerialName("recipient_id") val recipientId: String,
+    @SerialName("caller_id") val callerId: String? = null,
+    @SerialName("language_code") val languageCode: String = "auto",
+    @SerialName("enable_scam_detection") val enableScamDetection: Boolean = true,
+)
+
+@Serializable
+data class CallStartResult(
+    @SerialName("call_id") val callId: String,
+    @SerialName("room_id") val roomId: String,
+    @SerialName("caller_id") val callerId: String,
+    @SerialName("recipient_id") val recipientId: String,
+    val status: String,
+    @SerialName("ai_detection_active") val aiDetectionActive: Boolean = true,
+    @SerialName("consent_notice") val consentNotice: String? = null,
+)
+
+@Serializable
+data class CallActionDto(
+    @SerialName("user_id") val userId: String? = null,
+    val reason: String? = null,
+)
+
+@Serializable
+data class CallActionResult(
+    @SerialName("call_id") val callId: String,
+    val status: String,
+    val message: String,
+)
+
+@Serializable
+data class CallTokenDto(
+    @SerialName("user_id") val userId: String? = null,
+    @SerialName("ttl_seconds") val ttlSeconds: Int? = null,
+)
+
+@Serializable
+data class CallTokenResult(
+    val token: String,
+    @SerialName("server_url") val serverUrl: String,
+    @SerialName("room_id") val roomId: String,
+    @SerialName("participant_identity") val participantIdentity: String,
+    @SerialName("participant_name") val participantName: String? = null,
+    @SerialName("expires_in_seconds") val expiresInSeconds: Int = 3600,
+    @SerialName("ai_notice") val aiNotice: String? = null,
+)
+
+@Serializable
 private data class ErrorBody(val error: ErrorDetail)
 
 @Serializable
@@ -70,6 +119,23 @@ class ApiClient(private val http: OkHttpClient, private val baseUrl: String) {
 
     suspend fun demoCall(token: String, scenario: String): DemoCallResponse =
         post("/api/demo/calls", token, json.encodeToString(DemoCallRequest(scenario)))
+
+
+    suspend fun startCall(recipientId: String, callerId: String? = null, lang: String = "auto"): CallStartResult =
+        post("/api/calls/start", null, json.encodeToString(CallStartDto(recipientId, callerId, lang)))
+
+    suspend fun acceptCall(callId: String, userId: String? = null): CallActionResult =
+        post("/api/calls/$callId/accept", null, json.encodeToString(CallActionDto(userId)))
+
+    suspend fun rejectCall(callId: String, userId: String? = null, reason: String? = null): CallActionResult =
+        post("/api/calls/$callId/reject", null, json.encodeToString(CallActionDto(userId, reason)))
+
+    suspend fun endCall(callId: String, userId: String? = null, reason: String? = null): CallActionResult =
+        post("/api/calls/$callId/end", null, json.encodeToString(CallActionDto(userId, reason)))
+
+    suspend fun getCallToken(callId: String, userId: String? = null): CallTokenResult =
+        post("/api/calls/$callId/token", null, json.encodeToString(CallTokenDto(userId)))
+
 
     private suspend inline fun <reified T> post(path: String, token: String?, payload: String): T =
         send(request(path, token).post(body(payload)).build())

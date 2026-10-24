@@ -202,6 +202,22 @@ class Settings:
     telegram_timeout_seconds: float = field(
         default_factory=lambda: _env_float("TELEGRAM_TIMEOUT_SECONDS", 10.0)
     )
+    # LiveKit Cloud Real-Time Internet Calling Configuration
+    livekit_url: str = field(
+        default_factory=lambda: os.getenv("LIVEKIT_URL", "").strip()
+    )
+    livekit_api_key: str = field(
+        default_factory=lambda: os.getenv("LIVEKIT_API_KEY", "").strip()
+    )
+    livekit_api_secret: str = field(
+        default_factory=lambda: os.getenv("LIVEKIT_API_SECRET", "").strip()
+    )
+    livekit_token_ttl_seconds: int = field(
+        default_factory=lambda: _env_int("LIVEKIT_TOKEN_TTL_SECONDS", 3600)
+    )
+    livekit_ai_detection_enabled: bool = field(
+        default_factory=lambda: _env_bool("LIVEKIT_AI_DETECTION_ENABLED", True)
+    )
 
     @property
     def max_audio_bytes(self) -> int:
@@ -225,6 +241,21 @@ class Settings:
         return bool(
             token
             and token not in ("YOUR_TELEGRAM_BOT_TOKEN_HERE", "PLACEHOLDER")
+        )
+
+    @property
+    def has_livekit_credentials(self) -> bool:
+        url = (self.livekit_url or "").strip()
+        key = (self.livekit_api_key or "").strip()
+        secret = (self.livekit_api_secret or "").strip()
+        return bool(
+            url
+            and key
+            and secret
+            and not any(
+                p in (url, key, secret)
+                for p in ("YOUR_LIVEKIT_URL", "YOUR_LIVEKIT_KEY", "PLACEHOLDER", "example")
+            )
         )
 
     @property

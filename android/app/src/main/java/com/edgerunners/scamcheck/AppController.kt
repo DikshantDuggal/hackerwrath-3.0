@@ -19,6 +19,8 @@ import com.edgerunners.scamcheck.alert.Haptics
 import com.edgerunners.scamcheck.alert.MuteControl
 import com.edgerunners.scamcheck.alert.Reduction
 import com.edgerunners.scamcheck.call.CallService
+import com.edgerunners.scamcheck.call.LiveKitCallController
+import com.edgerunners.scamcheck.call.LiveKitCallEvent
 import com.edgerunners.scamcheck.call.TwilioCallController
 import com.edgerunners.scamcheck.call.VoiceCallEvent
 import com.edgerunners.scamcheck.data.ApiClient
@@ -96,6 +98,7 @@ class AppController(
     private val notifier: AlertNotifier,
     private val scope: CoroutineScope,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
+    private val livekit: LiveKitCallController? = null,
 ) : MuteControl {
 
     private val _state = MutableStateFlow(
@@ -123,6 +126,7 @@ class AppController(
             }
         }
         twilio?.let { t -> scope.launch { t.events.collect { onVoiceEvent(it) } } }
+        livekit?.let { lk -> scope.launch { lk.events.collect { onLiveKitEvent(it) } } }
         session.token?.let { token ->
             socket.start(token)
             scope.launch {
@@ -327,10 +331,61 @@ class AppController(
         }
     }
 
+    fun startLiveKitCall(recipientId: String) {
+        if (recipientId.isBlank()) return
+        scope.launch {
+            try {
+                CallService.start(app)
+                val callerId = session.userId ?: "user_local"
+                val res = api.startCall(recipientId = recipientId.trim(), callerId = callerId)
+                val tokenRes = api.getCallToken(res.callId, callerId)
+
+                reduce {
+                    AlertReducer.onEvent(
+                        it,
+                        AppEvent.CallStarted(
+                            callId = res.callId,
+                            seq = 1,
+                            fromNumber = recipientId.trim(),
+                            demo = false
+                        ),
+                        clock()
+                    )
+                }
+                _state.update { it.copy(answeredAtMs = clock(), muted = false, speaker = false) }
+
+                livekit?.connect(
+                    serverUrl = tokenRes.serverUrl,
+                    token = tokenRes.token,
+                    callId = res.callId,
+                    roomId = res.roomId
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("AppController", "Failed to start LiveKit call: ${e.message}", e)
+                CallService.stop(app)
+                _state.update { it.copy(notice = Notice.ReportFailed) }
+            }
+        }
+    }
+
     fun answer() {
         val call = _state.value.call
         if (call.phase != CallPhase.Ringing) return
-        if (!call.demo) twilio?.accept()
+        if (!call.demo) {
+            twilio?.accept()
+            val cid = call.callId
+            if (cid != null && cid.isNotBlank()) {
+                scope.launch {
+                    try {
+                        api.acceptCall(cid, session.userId)
+                        val tokenRes = api.getCallToken(cid, session.userId)
+                        livekit?.connect(tokenRes.serverUrl, tokenRes.token, cid, tokenRes.roomId)
+                    } catch (e: Exception) {
+                        android.util.Log.w("AppController", "Could not connect LiveKit on answer: ${e.message}")
+                    }
+                }
+            }
+        }
         reduce { AlertReducer.onAnswered(it, clock()) }
         _state.update { it.copy(answeredAtMs = clock(), muted = false, speaker = false) }
         postAction("answer")
@@ -338,7 +393,16 @@ class AppController(
 
     fun decline() {
         val call = _state.value.call
-        if (!call.demo) twilio?.reject()
+        if (!call.demo) {
+            twilio?.reject()
+            livekit?.disconnect()
+            val cid = call.callId
+            if (cid != null && cid.isNotBlank()) {
+                scope.launch {
+                    try { api.rejectCall(cid, session.userId) } catch (_: Exception) {}
+                }
+            }
+        }
         reduce { AlertReducer.onLocalEnd(it, EndReason.Declined) }
         postAction("decline")
     }
@@ -346,7 +410,16 @@ class AppController(
     fun endCall() {
         val call = _state.value.call
         if (call.phase != CallPhase.Ringing && call.phase != CallPhase.InCall) return
-        if (!call.demo) twilio?.hangUp()
+        if (!call.demo) {
+            twilio?.hangUp()
+            livekit?.disconnect()
+            val cid = call.callId
+            if (cid != null && cid.isNotBlank()) {
+                scope.launch {
+                    try { api.endCall(cid, session.userId) } catch (_: Exception) {}
+                }
+            }
+        }
         reduce { AlertReducer.onLocalEnd(it, EndReason.UserEnded) }
         postAction("end")
     }
@@ -424,13 +497,19 @@ class AppController(
     fun toggleMute() {
         val muted = !_state.value.muted
         _state.update { it.copy(muted = muted) }
-        if (!_state.value.call.demo) twilio?.setMuted(muted)
+        if (!_state.value.call.demo) {
+            twilio?.setMuted(muted)
+            livekit?.setMuted(muted)
+        }
     }
 
     fun toggleSpeaker() {
         val on = !_state.value.speaker
         _state.update { it.copy(speaker = on) }
-        if (!_state.value.call.demo) twilio?.setSpeaker(on)
+        if (!_state.value.call.demo) {
+            twilio?.setSpeaker(on)
+            livekit?.setSpeaker(on)
+        }
     }
 
     fun dismissEnded() = reduce { AlertReducer.onDismissEnded() }
@@ -445,7 +524,10 @@ class AppController(
     override fun userMuted(): Boolean = _state.value.muted
 
     override fun applyCallMute(muted: Boolean) {
-        if (!_state.value.call.demo) twilio?.setMuted(muted)
+        if (!_state.value.call.demo) {
+            twilio?.setMuted(muted)
+            livekit?.setMuted(muted)
+        }
     }
 
     // ---- Internals ----
@@ -480,6 +562,29 @@ class AppController(
             }
             VoiceCallEvent.Connected -> Unit
             is VoiceCallEvent.RegistrationFailed -> _state.update { it.copy(callingAvailable = false) }
+        }
+    }
+
+    private fun onLiveKitEvent(event: LiveKitCallEvent) {
+        when (event) {
+            is LiveKitCallEvent.Connected -> {
+                android.util.Log.i("AppController", "LiveKit call connected: ${event.callId}")
+                reduce { AlertReducer.onAnswered(it, clock()) }
+                _state.update { it.copy(answeredAtMs = clock(), muted = false, speaker = false) }
+            }
+            is LiveKitCallEvent.Disconnected -> {
+                android.util.Log.i("AppController", "LiveKit call disconnected: ${event.reason}")
+                if (_state.value.call.phase == CallPhase.InCall) {
+                    reduce { AlertReducer.onLocalEnd(it, EndReason.CallerEnded) }
+                }
+            }
+            is LiveKitCallEvent.Error -> {
+                android.util.Log.e("AppController", "LiveKit call error: ${event.message}")
+                if (_state.value.call.phase == CallPhase.InCall || _state.value.call.phase == CallPhase.Ringing) {
+                    reduce { AlertReducer.onLocalEnd(it, EndReason.CallerEnded) }
+                }
+            }
+            else -> Unit
         }
     }
 

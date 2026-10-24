@@ -331,7 +331,13 @@ fun AppRoot(state: AppUiState, controller: AppController) {
                     onDelete = { nav.dial = nav.dial.dropLast(1) },
                     onCall = {
                         // DEMO-FAKE: the app can't place outgoing calls yet.
-                        nav.toast = if (nav.dial.isEmpty()) context.getString(R.string.sb_type_number) else notBuilt
+                        if (nav.dial.isEmpty()) {
+                            nav.toast = context.getString(R.string.sb_type_number)
+                        } else {
+                            val target = nav.dial
+                            nav.sheet = null
+                            controller.startLiveKitCall(target)
+                        }
                         if (nav.dial.isNotEmpty()) nav.sheet = null
                     },
                     onDismiss = { nav.sheet = null },
@@ -341,7 +347,12 @@ fun AppRoot(state: AppUiState, controller: AppController) {
                     contactId = nav.contactId,
                     onCall = {
                         nav.sheet = null
-                        nav.toast = notBuilt // DEMO-FAKE: sample contacts can't be called
+                        val person = DemoPeople.byId(nav.contactId)
+                        if (person != null) {
+                            controller.startLiveKitCall(person.number)
+                        } else {
+                            nav.toast = notBuilt
+                        }
                     },
                     onCircle = { person ->
                         nav.sheet = null

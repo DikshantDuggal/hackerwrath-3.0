@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.twilio.voice)
+    implementation(libs.livekit.android)
     implementation(libs.firebase.messaging)
 
     testImplementation(libs.junit)

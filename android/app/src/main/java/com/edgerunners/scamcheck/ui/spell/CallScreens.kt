@@ -210,6 +210,17 @@ fun EarScreen(
             Text(fromNumber?.ifEmpty { null } ?: stringResource(R.string.unknown_number), style = TextStyle(fontSize = 14.sp), color = c.nightMuted)
             Text(clock(seconds), style = TextStyle(fontSize = 14.sp), color = c.nightMuted)
         }
+        Box(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(c.nightMuted.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 5.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "AI Scam Shield Active - Real-time fraud analysis enabled",
+                style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                color = c.nightMuted,
+                textAlign = TextAlign.Center,
+            )
+        }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             EarGlow(if (heard) c.warnGlow else c.earGlow)
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {

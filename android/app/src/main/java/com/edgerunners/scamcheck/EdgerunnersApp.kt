@@ -6,6 +6,7 @@ import com.edgerunners.scamcheck.alert.AlertNotifier
 import com.edgerunners.scamcheck.alert.AudioDeviceMonitor
 import com.edgerunners.scamcheck.alert.CuePlayer
 import com.edgerunners.scamcheck.alert.Haptics
+import com.edgerunners.scamcheck.call.LiveKitCallController
 import com.edgerunners.scamcheck.call.TwilioCallController
 import com.edgerunners.scamcheck.data.ApiClient
 import com.edgerunners.scamcheck.data.EventsSocket
@@ -53,6 +54,7 @@ class AppContainer(app: Application, callingEnabled: Boolean) {
     val notifier = AlertNotifier(app)
     val audioMonitor = AudioDeviceMonitor(app).also { it.startMonitoring() }
     val twilio: TwilioCallController? = if (callingEnabled) TwilioCallController(app) else null
+    val livekit = LiveKitCallController(app)
     val controller = AppController(
         app = app,
         api = api,
@@ -63,5 +65,6 @@ class AppContainer(app: Application, callingEnabled: Boolean) {
         haptics = Haptics(app),
         notifier = notifier,
         scope = scope,
+        livekit = livekit,
     )
 }
