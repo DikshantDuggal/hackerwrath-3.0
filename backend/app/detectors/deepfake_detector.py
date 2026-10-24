@@ -2,12 +2,17 @@
 Optional Deepfake / Synthetic Voice Detection Module.
 Designed behind an abstract interface so external acoustic spoofing models
 (e.g., AASIST, RawNet2, or commercial voice-liveness APIs) can be plugged in seamlessly.
+Now backed by the comprehensive VoiceAuthenticityDetector.
 """
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Optional
 from app.core.config import Settings, get_settings
+from app.detectors.voice_authenticity_detector import (
+    VoiceAuthenticityState,
+    get_voice_authenticity_detector,
+)
 from app.schemas.analysis import DeepfakeAnalysisResult
 
 
@@ -23,7 +28,7 @@ class BaseDeepfakeDetector(ABC):
 
 class HeuristicAcousticDeepfakeDetector(BaseDeepfakeDetector):
     """
-    Default pluggable deepfake detector implementation.
+    Pluggable deepfake detector implementation powered by VoiceAuthenticityDetector.
     Disabled by default unless ENABLE_DEEPFAKE_DETECTION=true.
     """
 
@@ -39,22 +44,28 @@ class HeuristicAcousticDeepfakeDetector(BaseDeepfakeDetector):
                 is_suspected_deepfake=False,
                 spoof_score=0.0,
                 confidence=0.0,
-                provider="acoustic_heuristic_v1",
+                provider="voice_authenticity_v2",
                 explanation="Deepfake voice detection is disabled or no raw audio provided.",
             )
 
-        # Deterministic check on synthetic test markers or header metadata
-        is_synthetic_marker = b"SYNTHETIC_VOICE_MARKER" in audio_bytes or "deepfake" in filename.lower()
-        score = 0.82 if is_synthetic_marker else 0.08
+        detector = get_voice_authenticity_detector()
+        auth_res = detector.evaluate_pcm16(audio_bytes)
+
+        # Also support test filename markers
+        is_marker = "deepfake" in filename.lower() or b"SYNTHETIC_VOICE_MARKER" in audio_bytes
+        is_deepfake = is_marker or auth_res.state == VoiceAuthenticityState.SPOOF_SYNTHETIC
+        spoof_score = max(0.82 if is_marker else 0.0, auth_res.synthetic_probability)
+        confidence = max(0.75 if is_marker else 0.0, auth_res.confidence)
+
+        explanation = "; ".join(auth_res.reasons)
+        if is_marker and "synthetic" not in explanation.lower():
+            explanation = "Synthetic acoustic artifacts detected in voice stream."
+
         return DeepfakeAnalysisResult(
             enabled=True,
-            is_suspected_deepfake=score >= 0.70,
-            spoof_score=score,
-            confidence=0.75,
-            provider="acoustic_heuristic_v1",
-            explanation=(
-                "Synthetic acoustic artifacts detected in voice stream."
-                if is_synthetic_marker
-                else "No strong synthetic voice spoofing artifacts detected."
-            ),
+            is_suspected_deepfake=is_deepfake,
+            spoof_score=round(spoof_score, 2),
+            confidence=round(confidence, 2),
+            provider="voice_authenticity_v2",
+            explanation=explanation,
         )

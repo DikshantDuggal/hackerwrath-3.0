@@ -18,6 +18,7 @@ from app.schemas.analysis import (
     ContextualAIWireSchema,
     ContextualAnalysisOutput,
 )
+from app.detectors.sensitive_info_detector import get_sensitive_info_detector
 from app.services.rules_engine import (
     REGEX_OTP_SOLICITATION,
     REGEX_URGENT_PAYMENT,
@@ -230,8 +231,10 @@ class ContextualAnalyzer:
             possible_impersonation = True
 
         # Detect protective advice or legitimate payment context
+        sens_info = get_sensitive_info_detector().detect(current_text)
         is_protective_otp = (
-            any(
+            sens_info.is_protective_warning
+            or any(
                 p in norm
                 for p in (
                     "never share your otp",
@@ -242,14 +245,19 @@ class ContextualAnalyzer:
                     "bank will never ask",
                     "otp mat batana",
                     "kisi ko otp mat",
+                    "kisi ke saath share mat",
+                    "kisi ke sath share mat",
+                    "share mat karna",
+                    "share mat karo",
+                    "share na karein",
+                    "kisi nu share na",
                     "ओटीपी मत बताना",
                     "कभी भी ओटीपी साझा न करें",
                     "ਓਟੀਪੀ ਨਾ ਦੱਸੋ",
+                    "ਸ਼ੇਅਰ ਨਾ ਕਰੋ",
                 )
             )
-            and "ab otp batao" not in norm
-            and "tell me the code" not in norm
-        )
+        ) and "ab otp batao" not in norm and "tell me the code" not in norm
 
         is_legitimate_buyer_paying = (
             any(
@@ -515,7 +523,7 @@ class ContextualAnalyzer:
                 possible_impersonation=False,
                 protective_or_legitimate_explanations=protective_explanations,
                 supporting_excerpts=[current_text[:180]],
-                contextual_caption="Protective security reminder or legitimate payment coordination detected",
+                contextual_caption="Protective security reminder detected: Warning never to share credentials or OTP" if is_protective_otp else "Legitimate payment coordination detected",
                 intent_classification="PROTECTIVE_WARNING" if is_protective_otp else "LEGITIMATE_INQUIRY",
                 intent_risk_score=0.0,
                 model_confidence=0.92,

@@ -327,17 +327,40 @@ class RiskScorer:
 
         # If purely protective, educational, quoted, or benign notification with no un-negated attack
         if (is_protective or is_educational or is_quoted or is_benign) and not sens_res.is_solicitation:
+            counter_evidence.extend(sens_res.counter_evidence)
+            # Purge any false-positive solicitation indicators and reasons triggered by protective / educational context
+            clean_indicators = [
+                ind for ind in indicators
+                if (ind.get("category") if isinstance(ind, dict) else getattr(ind, "category", "")) not in (
+                    "OTP_OR_PIN_REQUEST",
+                    "QR_SCAN_TO_RECEIVE_MONEY",
+                    "FINANCIAL_SOLICITATION",
+                    "REMOTE_ACCESS_OR_SCREEN_SHARE",
+                    "SUSPICIOUS_LINK_OR_APK",
+                )
+            ]
+            clean_reasons = [
+                r for r in reasons
+                if not r.startswith("[OTP_OR_PIN_REQUEST]")
+                and "solicitation" not in r.lower()
+                and "requested an otp" not in r.lower()
+            ]
             expl_msg = ""
+            caption_msg = ""
             if is_protective:
                 expl_msg = "Protective security advice detected warning never to disclose credentials or sensitive information."
+                caption_msg = "Protective security reminder detected: Warning never to share credentials or OTP"
             elif is_educational:
                 expl_msg = "Educational discussion regarding scam techniques detected without active fraud solicitation."
+                caption_msg = "Educational scam awareness discussion detected"
             elif is_quoted:
                 expl_msg = "Quoted/reported speech narrating a past caller attempt detected rather than a live attack."
+                caption_msg = "Narrative or quoted reference to a past contact attempt"
             elif is_benign:
                 expl_msg = "Standard notification or official self-service instruction detected."
+                caption_msg = "Standard system notification or self-service instruction"
 
-            reasons.append(expl_msg)
+            clean_reasons.append(expl_msg)
             alert = self.alert_service.build_alert("LOW", 0.0, [])
             return ScamRiskAssessment(
                 risk_score=0.0,
@@ -345,17 +368,23 @@ class RiskScorer:
                 risk_level="LOW",
                 status="success",
                 confidence=0.92,
-                caption=contextual_result.contextual_caption or "Protective or benign conversation",
-                reasons=reasons,
+                caption=caption_msg,
+                reasons=clean_reasons,
                 explanation=expl_msg,
-                indicators=indicators,
-                evidence=evidence,
+                indicators=clean_indicators,
+                evidence=[],
                 counter_evidence=counter_evidence,
                 limitations=limitations,
                 recommended_action=(
                     "Continue with normal caution. Never share OTPs, UPI PINs, or passwords with anyone on a phone call. Legitimate organizations will never ask for your secret codes."
                 ),
-                rule_analysis=rule_result,
+                rule_analysis=RuleEngineResult(
+                    rule_score=0.0,
+                    triggered_indicators=clean_indicators,
+                    suppressed_protective_matches=rule_result.suppressed_protective_matches,
+                    duplicate_indicators_skipped=rule_result.duplicate_indicators_skipped,
+                    synced_keywords_matched=[],
+                ),
                 contextual_analysis=contextual_result,
                 icfd_analysis=icfd_result,
                 deepfake_analysis=deepfake_result,

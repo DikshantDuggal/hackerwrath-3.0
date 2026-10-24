@@ -421,8 +421,10 @@ class LiveAudioSession:
             for idx, w_chunk in enumerate(word_chunks):
                 self.total_words_emitted += len(w_chunk.split())
                 is_last_in_slice = idx == len(word_chunks) - 1
+                event_id = f"evt_{self.call_id}_ch{ch.channel_id}_{ch.slice_counter}_{idx}"
 
                 event_payload = {
+                    "eventId": event_id,
                     "type": "caption_chunk",
                     "callId": self.call_id,
                     "channel": ch.channel_id,
@@ -435,6 +437,7 @@ class LiveAudioSession:
                     "language": stt_res.language_code,
                     "riskScore": seg_assessment.risk_score,
                     "riskLevel": seg_assessment.risk_level,
+                    "caption": seg_assessment.caption,
                     "confidence": seg_assessment.confidence,
                     "transcriptConfidence": stt_res.confidence,
                     "retrievalSimilarity": retrieval_sim,
@@ -461,24 +464,8 @@ class LiveAudioSession:
                     except Exception as cb_err:
                         logger.warning("Error in on_event_callback: %s", cb_err)
 
-            # Check if Telegram alert should be triggered (based on cumulative call state)
-            if (
-                cum_assessment.risk_level in ("HIGH", "CRITICAL")
-                and self.telegram_service.is_enabled
-            ):
-                alert_res = self.telegram_service.send_risk_alert(cum_assessment, self.call_id)
-                if alert_res.delivered:
-                    alert_event = {
-                        "type": "telegram_alert_sent",
-                        "callId": self.call_id,
-                        "channel": ch.channel_id,
-                        "speaker": ch.speaker,
-                        "messageId": alert_res.message_id,
-                        "riskLevel": cum_assessment.risk_level,
-                        "riskScore": cum_assessment.risk_score,
-                        "timestamp": round(time.time(), 3),
-                    }
-                    await self.broadcaster.broadcast(alert_event)
+            # Telegram alert dispatch is handled centrally by conversation_manager.process_segment
+            # to eliminate duplicate alert deliveries and ensure atomic deduplication.
 
         except Exception as exc:
             logger.warning(

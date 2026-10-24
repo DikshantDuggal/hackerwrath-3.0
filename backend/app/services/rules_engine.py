@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from app.core.config import DEFAULT_RULE_WEIGHTS, Settings, get_settings
 from app.schemas.analysis import RuleEngineResult, TriggeredIndicator
 from app.services.keyword_sync_service import KeywordSyncService, get_keyword_sync_service
+from app.detectors.sensitive_info_detector import get_sensitive_info_detector
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,23 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     ("otp mat batana", "Hindi protective advice against sharing OTP"),
     ("pin mat batana", "Hindi protective advice against sharing PIN"),
     ("kisi ke saath otp share na karein", "Hindi protective advice"),
+    ("kisi ke saath share mat karna", "Hindi protective advice against sharing"),
+    ("kisi ke sath share mat karna", "Hindi protective advice against sharing"),
+    ("kisi ke saath share mat", "Hindi protective advice against sharing"),
+    ("kisi ke sath share mat", "Hindi protective advice against sharing"),
+    ("share mat karna", "Hindi protective advice against sharing"),
+    ("share mat karo", "Hindi protective advice against sharing"),
+    ("share mat kijiye", "Hindi protective advice against sharing"),
+    ("kisi ko bhi share mat karna", "Hindi protective advice"),
+    ("kisi se share mat karna", "Hindi protective advice"),
+    ("share na karein", "Hindi protective advice"),
+    ("mat share karna", "Hindi protective advice"),
+    ("kabhi share mat karna", "Hindi protective advice"),
+    ("kisi nu share na karo", "Punjabi protective advice against sharing"),
+    ("kisi nu share na karna", "Punjabi protective advice against sharing"),
+    ("kisi naal share na karo", "Punjabi protective advice against sharing"),
+    ("शेयर मत करना", "Hindi protective advice in Devanagari"),
+    ("ਸ਼ੇਅਰ ਨਾ ਕਰੋ", "Punjabi protective advice in Gurmukhi"),
     ("kisi link par click mat karna", "Hindi protective advice against links"),
     ("anydesk install mat karna", "Hindi protective advice against remote tools"),
     ("ओटीपी मत बताना", "Hindi protective advice in Devanagari"),
@@ -478,13 +496,18 @@ class RulesEngine:
 
             # 1. Check if this clause is protective advice or a legitimate buyer payment offer
             matched_protective = False
-            for prot_phrase, prot_reason in PROTECTIVE_OR_LEGITIMATE_PATTERNS:
-                if normalise_text(prot_phrase) in norm_clause:
-                    # Ensure the same clause isn't simultaneously commanding "ab otp batao"
-                    if "ab otp batao" not in norm_clause and "tell me the code" not in norm_clause:
-                        suppressed_protective.append(f"{prot_phrase} ({prot_reason})")
-                        matched_protective = True
-                        break
+            sens_check = get_sensitive_info_detector().detect(clause)
+            if (sens_check.is_protective_warning or sens_check.is_educational_discussion) and "ab otp batao" not in norm_clause and "tell me the code" not in norm_clause:
+                suppressed_protective.append(f"{sens_check.explanation}")
+                matched_protective = True
+            else:
+                for prot_phrase, prot_reason in PROTECTIVE_OR_LEGITIMATE_PATTERNS:
+                    if normalise_text(prot_phrase) in norm_clause:
+                        # Ensure the same clause isn't simultaneously commanding "ab otp batao"
+                        if "ab otp batao" not in norm_clause and "tell me the code" not in norm_clause:
+                            suppressed_protective.append(f"{prot_phrase} ({prot_reason})")
+                            matched_protective = True
+                            break
 
             if matched_protective:
                 continue
