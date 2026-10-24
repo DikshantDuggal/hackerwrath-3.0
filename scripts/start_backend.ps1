@@ -40,13 +40,18 @@ Write-Host "      - HF Cache:    $env:HF_HOME"
 Write-Host "      - Pip Cache:   $env:PIP_CACHE_DIR"
 
 # 2. Locate Python Interpreter
-$PythonExe = "C:\Users\diksh\AppData\Local\Programs\Python\Python311\python.exe"
-if (-not (Test-Path $PythonExe)) {
-    $PythonCmd = Get-Command python -ErrorAction SilentlyContinue
-    if ($PythonCmd) {
-        $PythonExe = $PythonCmd.Source
-    } else {
-        throw "Python interpreter not found. Please install Python 3.11."
+$VenvPython = "D:\edgerunner guardian frontend\backend\.venv\Scripts\python.exe"
+if (Test-Path $VenvPython) {
+    $PythonExe = $VenvPython
+} else {
+    $PythonExe = "C:\Users\diksh\AppData\Local\Programs\Python\Python311\python.exe"
+    if (-not (Test-Path $PythonExe)) {
+        $PythonCmd = Get-Command python -ErrorAction SilentlyContinue
+        if ($PythonCmd) {
+            $PythonExe = $PythonCmd.Source
+        } else {
+            throw "Python interpreter not found. Please install Python 3.11."
+        }
     }
 }
 Write-Host "[2/4] Python Runtime: $PythonExe" -ForegroundColor Green

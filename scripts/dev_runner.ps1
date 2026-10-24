@@ -36,7 +36,10 @@ $env:ANDROID_AVD_HOME = "D:\android-tools\.android\avd"
 $env:GRADLE_USER_HOME = "D:\android-tools\.gradle"
 $env:PATH = "D:\edgerunner_tools\HatchZip;D:\android-tools\android-sdk\emulator;D:\android-tools\android-sdk\platform-tools;D:\android-tools\jdk-17.0.20.1+1\bin;$env:PATH"
 
-$PythonExe = "C:\Users\diksh\AppData\Local\Programs\Python\Python311\python.exe"
+$PythonExe = "$BackendDir\.venv\Scripts\python.exe"
+if (-not (Test-Path $PythonExe)) {
+    $PythonExe = "C:\Users\diksh\AppData\Local\Programs\Python\Python311\python.exe"
+}
 
 function Run-Tests {
     Write-Host "`n=== [RUNNING BACKEND TEST SUITE] ===" -ForegroundColor Green
