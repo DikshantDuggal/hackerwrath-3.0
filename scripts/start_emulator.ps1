@@ -15,7 +15,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   EdgeRunner Guardian — Android Emulator Launcher       " -ForegroundColor Cyan
+Write-Host "   EdgeRunner Guardian - Android Emulator Launcher       " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Enforce D: drive SDK and AVD storage
@@ -23,14 +23,14 @@ $env:JAVA_HOME = "D:\android-tools\jdk-17.0.20.1+1"
 $env:ANDROID_HOME = "D:\android-tools\android-sdk"
 $env:ANDROID_SDK_ROOT = "D:\android-tools\android-sdk"
 $env:ANDROID_AVD_HOME = "D:\android-tools\.android\avd"
-$env:PATH = "D:\android-tools\android-sdk\emulator;D:\android-tools\android-sdk\platform-tools;D:\android-tools\jdk-17.0.20.1+1\bin;$env:PATH"
+$env:PATH = "D:\android-tools\android-sdk\emulator;D:\android-tools\android-sdk\platform-tools;D:\android-tools\jdk-17.0.20.1+1\bin;" + $env:PATH
 
 $AdbExe = "D:\android-tools\android-sdk\platform-tools\adb.exe"
 $EmulatorExe = "D:\android-tools\android-sdk\emulator\emulator.exe"
 
-Write-Host "[1/5] Storage & Environment Configured (Target: D: Drive)" -ForegroundColor Green
-Write-Host "      - ANDROID_HOME:     $env:ANDROID_HOME"
-Write-Host "      - ANDROID_AVD_HOME: $env:ANDROID_AVD_HOME"
+Write-Host "[1/5] Storage and Environment Configured (Target: D: Drive)" -ForegroundColor Green
+Write-Host "      - ANDROID_HOME:     $($env:ANDROID_HOME)"
+Write-Host "      - ANDROID_AVD_HOME: $($env:ANDROID_AVD_HOME)"
 
 if (-not (Test-Path $EmulatorExe)) {
     throw "Emulator binary not found at $EmulatorExe. Please ensure emulator package is installed."
@@ -40,7 +40,7 @@ if (-not (Test-Path $EmulatorExe)) {
 Write-Host "[2/5] Checking AVD Configuration for '$AvdName'..." -ForegroundColor Green
 $avdList = & $EmulatorExe -list-avds
 if ($avdList -notcontains $AvdName) {
-    Write-Warning "AVD '$AvdName' was not found in $env:ANDROID_AVD_HOME."
+    Write-Warning "AVD '$AvdName' was not found in $($env:ANDROID_AVD_HOME)."
     Write-Host "Available AVDs: $($avdList -join ', ')"
     if ($avdList.Count -gt 0) {
         $AvdName = $avdList[0]
@@ -77,7 +77,7 @@ if ($attachedDevices) {
         } catch {
             $bootCompleted = ""
         }
-        Write-Host "      Boot status: $bootCompleted ($elapsed s / $timeoutSeconds s)"
+        Write-Host "      Boot status: $bootCompleted ($elapsed / $timeoutSeconds s)"
     }
 
     if ($bootCompleted -ne "1") {
@@ -88,7 +88,7 @@ if ($attachedDevices) {
 }
 
 # 4. Configure ADB Reverse Port Forwarding
-Write-Host "[4/5] Configuring ADB Port Mapping (8000 -> 8000)..." -ForegroundColor Green
+Write-Host "[4/5] Configuring ADB Port Mapping (8000 to 8000)..." -ForegroundColor Green
 & $AdbExe reverse tcp:8000 tcp:8000
 
 # 5. Install and Launch APK

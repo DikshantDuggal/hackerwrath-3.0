@@ -19,6 +19,7 @@ from app.api.routes_calls import router as calls_router
 from app.api.routes_health import router as health_router
 from app.api.routes_live_ingest import router as live_ingest_router
 from app.api.routes_livekit_calls import router as livekit_calls_router
+from app.api.routes_mobile import router as mobile_router, ws_router as mobile_ws_router
 from app.api.routes_rag import router as rag_router
 from app.api.routes_telegram import router as telegram_router
 from app.api.routes_transcription import router as transcription_router
@@ -60,24 +61,8 @@ def create_app() -> FastAPI:
     application.include_router(telegram_router)
     application.include_router(live_ingest_router)
     application.include_router(rag_router)
-
-    # Demo Authentication & Settings endpoints for Android mobile app
-    @application.post("/api/login")
-    async def api_login(payload: dict = None):
-        user = (payload or {}).get("username", "demo-user")
-        return {"app_token": "demo_app_token_jwt", "user_id": f"u_{user}"}
-
-    @application.get("/api/settings")
-    async def api_get_settings():
-        return {"scam_check": True, "lang": "hi", "role_context": "expecting_payment"}
-
-    @application.put("/api/settings")
-    async def api_put_settings(payload: dict = None):
-        return payload or {"scam_check": True, "lang": "hi", "role_context": "expecting_payment"}
-
-    @application.post("/api/voice-token")
-    async def api_voice_token():
-        return {"voice_token": "demo_voice_token", "identity": "u_demo"}
+    application.include_router(mobile_router)
+    application.include_router(mobile_ws_router)
 
     # Mount compiled frontend dist if available so http://127.0.0.1:8000 serves the UI directly
     dist_dir = Path(__file__).resolve().parent.parent / "dist"
