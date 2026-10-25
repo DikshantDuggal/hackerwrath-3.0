@@ -1027,14 +1027,14 @@ class ScamCallBackendTestSuite(unittest.TestCase):
     def test_28_telegram_sync_and_set_chat_id(self) -> None:
         """Verifies Telegram identity sync and manual/discovered chat ID binding."""
         tg_settings = Settings(
-            telegram_bot_token="8791679803:AAGrWVK7nuGRV4b1qNc3aHkIt6qT-D_nlhU",
+            telegram_bot_token="0000000000:AAFakeMockTelegramTokenForTesting_00",
             telegram_chat_id="",
             telegram_alerts_enabled=True,
         )
 
         def mock_transport(method: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             if method == "getMe":
-                return {"ok": True, "result": {"id": 8791679803, "username": "EdgingToRunner_bot"}}
+                return {"ok": True, "result": {"id": 123456789, "username": "mock_test_bot"}}
             if method == "getUpdates":
                 return {
                     "ok": True,
@@ -1054,7 +1054,7 @@ class ScamCallBackendTestSuite(unittest.TestCase):
         service = TelegramAlertService(settings=tg_settings, http_transport=mock_transport)
         sync_res = service.sync_bot_identity()
         self.assertTrue(sync_res["ok"])
-        self.assertEqual(sync_res["bot_username"], "EdgingToRunner_bot")
+        self.assertEqual(sync_res["bot_username"], "mock_test_bot")
         self.assertEqual(sync_res["chat_id"], "12345678")
         self.assertTrue(service.is_configured)
 
