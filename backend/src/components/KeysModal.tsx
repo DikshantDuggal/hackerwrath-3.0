@@ -15,7 +15,7 @@ export default function KeysModal({ isOpen, onClose }: KeysModalProps) {
 
   const handleCopyEnv = () => {
     const envContent = `# Sarvam AI Configuration (Speech-to-Text)
-SARVAM_API_KEY="sk_ccuk587o_oSe0neRNm8GhXzTotbDMvQRV"
+SARVAM_API_KEY="your_sarvam_api_key_here"
 SARVAM_BASE_URL="https://api.sarvam.ai"
 SARVAM_STT_MODEL="saaras:v3"
 
@@ -106,7 +106,7 @@ TELEGRAM_AUTHORIZED_USERS=""
               Powers real-time Speech-to-Text (Saaras v3) in Hindi, Indian English, and Punjabi.
             </p>
             <div className="mt-2 text-[11px] font-mono text-emerald-400/90 bg-black/40 px-2.5 py-1 rounded-lg">
-              Key: sk_ccuk587o...•••••••• [Configured]
+              Key: Configured via .env
             </div>
           </div>
 
