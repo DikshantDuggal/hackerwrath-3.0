@@ -7,7 +7,7 @@
 #>
 
 param(
-    [string]$AvdName = "edgerunner_pixel",
+    [string]$AvdName = "edgerunner_playstore",
     [switch]$NoGui = $false,
     [switch]$SkipInstall = $false
 )
