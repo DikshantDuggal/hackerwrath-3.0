@@ -64,6 +64,20 @@ def create_app() -> FastAPI:
     application.include_router(mobile_router)
     application.include_router(mobile_ws_router)
 
+    @application.on_event("startup")
+    async def on_startup() -> None:
+        from app.services.telegram_service import get_telegram_service
+        tg = get_telegram_service()
+        if tg.is_configured:
+            import asyncio
+            asyncio.create_task(tg.start_polling_loop())
+
+    @application.on_event("shutdown")
+    async def on_shutdown() -> None:
+        from app.services.telegram_service import get_telegram_service
+        tg = get_telegram_service()
+        tg.stop_polling_loop()
+
     # Mount compiled frontend dist if available so http://127.0.0.1:8000 serves the UI directly
     dist_dir = Path(__file__).resolve().parent.parent / "dist"
     assets_dir = dist_dir / "assets"

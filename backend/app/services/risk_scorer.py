@@ -515,6 +515,11 @@ class RiskScorer:
             rule_result.rule_score > 0.0
             and len(rule_result.triggered_indicators) == 1
             and not sens_res.is_solicitation
+            and rule_result.triggered_indicators[0].category not in (
+                "REMOTE_ACCESS_OR_SCREEN_SHARE",
+                "QR_SCAN_TO_RECEIVE_MONEY",
+                "THREAT_ARREST_OR_LEGAL_ACTION",
+            )
             and contextual_result.intent_classification in ("PROTECTIVE_WARNING", "LEGITIMATE_INQUIRY")
             and contextual_result.intent_risk_score < 20.0
         ):
@@ -541,7 +546,8 @@ class RiskScorer:
         # to LOW or MEDIUM by a cautious LLM or weak contextual score.
         categories_triggered = {ind.category for ind in rule_result.triggered_indicators}
         has_otp_rule = "OTP_OR_PIN_REQUEST" in categories_triggered
-        has_sensitive_solicitation = sens_res.is_solicitation or has_otp_rule
+        has_remote_access = "REMOTE_ACCESS_OR_SCREEN_SHARE" in categories_triggered
+        has_sensitive_solicitation = sens_res.is_solicitation or has_otp_rule or has_remote_access
 
         # Check for corroborating attack signals
         has_authority_claim = (
@@ -571,8 +577,9 @@ class RiskScorer:
 
             if combined < base_floor:
                 combined = base_floor
+                action_desc = "remote access application installation or sensitive authentication" if has_remote_access else "sensitive authentication information"
                 reasons.append(
-                    "Deterministic safety override activated: un-negated sensitive authentication information solicitation detected. Banks and legitimate services never ask for OTP or PIN over phone calls."
+                    f"Deterministic safety override activated: un-negated {action_desc} solicitation detected. Banks and legitimate services never ask for remote access or OTP/PIN over phone calls."
                 )
 
         risk_score = round(min(100.0, max(0.0, combined)), 2)

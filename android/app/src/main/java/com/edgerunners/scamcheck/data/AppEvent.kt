@@ -15,6 +15,7 @@ import kotlinx.serialization.json.jsonObject
 /** Events from the backend's app WebSocket. Keys and enums only; never text to show. */
 sealed interface AppEvent {
     data object Ready : AppEvent
+    data object MessageAnalyzed : AppEvent
 
     sealed interface CallEvent : AppEvent {
         val callId: String
@@ -59,6 +60,7 @@ object EventParser {
         if (o.int("v") != 1) return null
         val type = o.str("type") ?: return null
         if (type == "ready") return AppEvent.Ready
+        if (type == "message_analyzed") return AppEvent.MessageAnalyzed
         val callId = o.str("call_id") ?: return null
         val seq = o.int("event_seq") ?: return null
         return when (type) {

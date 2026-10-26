@@ -66,6 +66,9 @@ class TelegramAlertService:
         self._last_error: Optional[str] = None
         self._bot_username: Optional[str] = None
         self._alerts_muted: bool = False
+        self._polling_active: bool = False
+        self._last_update_id: int = 0
+        self._processed_update_ids: Set[int] = set()
 
     @property
     def is_configured(self) -> bool:
@@ -320,6 +323,150 @@ class TelegramAlertService:
             data = json.loads(resp.read().decode("utf-8"))
             return data
 
+    def download_file_bytes(self, file_path: str) -> bytes:
+        """Downloads file bytes (e.g. voice note audio) from Telegram Bot API."""
+        if self.http_transport is not None:
+            res = self.http_transport("downloadFile", {"file_path": file_path})
+            if isinstance(res, (bytes, bytearray)):
+                return bytes(res)
+            if isinstance(res, dict) and "bytes" in res:
+                return res["bytes"]
+        url = f"https://api.telegram.org/file/bot{self.settings.telegram_bot_token}/{file_path}"
+        req = urllib.request.Request(url=url, headers={"User-Agent": "EdgeRunnerGuardian/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.read()
+
+    def process_incoming_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Ingests Telegram text messages or voice notes, transcribes audio via Sarvam Saaras,
+        evaluates scam risk, saves to mobile history, broadcasts to Android app, and replies.
+        """
+        chat = message.get("chat") or {}
+        chat_id = chat.get("id") or self.settings.telegram_chat_id
+        msg_id = f"tg_{message.get('message_id', int(time.time()))}"
+        transcript = ""
+        is_voice = False
+
+        voice = message.get("voice") or message.get("audio")
+        if voice:
+            is_voice = True
+            file_id = voice.get("file_id")
+            if not file_id:
+                return {"error": "Missing file_id in voice payload"}
+            if self.http_transport is not None:
+                file_info = self.http_transport("getFile", {"file_id": file_id})
+            else:
+                file_info = self._dispatch_http_request("getFile", {"file_id": file_id})
+            file_path = file_info.get("result", {}).get("file_path")
+            if not file_path:
+                return {"error": "Could not resolve Telegram file_path"}
+            audio_bytes = self.download_file_bytes(file_path)
+            from app.api.routes_transcription import get_stt_provider
+            stt = get_stt_provider()
+            filename = file_path.split("/")[-1] if "/" in file_path else "voice.ogg"
+            trans_res = stt.transcribe_bytes(audio_bytes=audio_bytes, filename=filename, language_code="auto")
+            transcript = trans_res.transcript
+        else:
+            transcript = (message.get("text") or "").strip()
+
+        if not transcript:
+            return {"error": "Empty message text or empty voice transcription"}
+
+        from app.api.routes_analysis import get_conversation_manager
+        from app.schemas.analysis import TranscriptAnalysisRequest
+        from app.detectors.sensitive_info_detector import get_sensitive_info_detector
+        from app.services.language_detector import get_language_detector
+
+        cm = get_conversation_manager()
+        assessment = cm.analyze_standalone_transcript(TranscriptAnalysisRequest(
+            transcript=transcript,
+            language_code="auto",
+            call_id=msg_id,
+        ))
+        is_protective = get_sensitive_info_detector().detect(transcript).is_protective_warning
+        lang_info = get_language_detector().detect(transcript)
+
+        from app.api.routes_mobile import _analyzed_messages, MessageAnalysisResponse
+        record = MessageAnalysisResponse(
+            id=msg_id,
+            timestamp=time.time(),
+            original_text=transcript,
+            normalized_text=assessment.normalized_text or lang_info.normalized_text,
+            detected_language=assessment.detected_language or lang_info.detected_language,
+            detected_script=assessment.detected_script or lang_info.detected_script,
+            risk_score=assessment.risk_score,
+            risk_level=assessment.risk_level,
+            headline=assessment.caption,
+            safe_action=assessment.recommended_action,
+            signals=assessment.reasons if assessment.reasons else [e.category for e in assessment.evidence],
+            protective_advice=is_protective,
+            is_conversational=lang_info.is_conversational,
+        )
+        _analyzed_messages.insert(0, record.model_dump())
+        if len(_analyzed_messages) > 50:
+            _analyzed_messages.pop()
+
+        try:
+            import asyncio
+            from app.services.live_audio_processor import get_broadcaster
+            broadcaster = get_broadcaster()
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(broadcaster.broadcast({
+                    "v": 1,
+                    "type": "message_analyzed",
+                    "message_id": msg_id,
+                    "risk_level": assessment.risk_level,
+                    "risk_score": assessment.risk_score,
+                    "detected_language": record.detected_language,
+                    "detected_script": record.detected_script,
+                    "headline": assessment.caption,
+                    "safe_action": assessment.recommended_action,
+                    "protective_advice": is_protective,
+                }))
+            except RuntimeError:
+                pass
+        except Exception:
+            pass
+
+        if is_voice:
+            reply_text = (
+                f"🎙️ <b>Transcribed Voice Note:</b>\n"
+                f"<i>\"{scrub_sensitive_pii(transcript)}\"</i>\n\n"
+                f"<b>Language:</b> {record.detected_language} ({record.detected_script})\n"
+                f"<b>Risk Assessment:</b> <b>{assessment.risk_level}</b> ({int(round(assessment.risk_score))}/100)\n\n"
+                f"<b>🛡️ Safe Recommendation:</b>\n{scrub_sensitive_pii(assessment.recommended_action)}"
+            )
+        else:
+            reply_text = (
+                f"🔍 <b>Scam Risk Assessment:</b> <b>{assessment.risk_level}</b> ({int(round(assessment.risk_score))}/100)\n\n"
+                f"<b>Language:</b> {record.detected_language} ({record.detected_script})\n"
+                f"<b>Analysis:</b> {scrub_sensitive_pii(assessment.caption)}\n\n"
+                f"<b>🛡️ Safe Recommendation:</b>\n{scrub_sensitive_pii(assessment.recommended_action)}"
+            )
+
+        if chat_id:
+            try:
+                reply_payload = {
+                    "chat_id": str(chat_id),
+                    "text": reply_text,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True,
+                }
+                if self.http_transport is not None:
+                    self.http_transport("sendMessage", reply_payload)
+                else:
+                    self._dispatch_http_request("sendMessage", reply_payload)
+            except Exception as exc:
+                logger.warning("Failed to send Telegram analysis reply: %s", exc)
+
+        return {
+            "transcript": transcript,
+            "assessment": assessment.model_dump(),
+            "record": record.model_dump(),
+            "reply_text": reply_text,
+        }
+
     def sync_bot_identity(self) -> Dict[str, Any]:
         """
         Queries official Telegram Bot API (getMe, getUpdates) to discover bot identity
@@ -424,73 +571,127 @@ class TelegramAlertService:
                 authorized=False,
             )
 
-        if not text:
+        voice = message.get("voice") or message.get("audio")
+        if not text and not voice:
             return TelegramCommandResponse(handled=False, authorized=True)
 
-        cmd = text.split()[0].lower()
+        # If incoming text is a slash command
+        if text.startswith("/"):
+            cmd = text.split()[0].lower()
 
-        if cmd in ("/start", "/help"):
-            reply = (
-                "🛡️ <b>Suraksha AI Scam Shield Bot</b>\n\n"
-                "<b>Supported Commands:</b>\n"
-                "• <code>/status</code> - View backend STT, AI detector, and alert status\n"
-                "• <code>/latest</code> - View latest call risk assessment\n"
-                "• <code>/mute</code> - Temporarily mute Telegram notifications\n"
-                "• <code>/unmute</code> - Re-enable Telegram notifications\n"
-                "• <code>/help</code> - Show this guidance message\n\n"
-                "<i>⚠️ Note on Call Control: Suraksha alerts cannot mute or disconnect cellular GSM carrier calls. "
-                "Always hang up via your phone dialer if a scam is suspected.</i>"
-            )
-            return TelegramCommandResponse(handled=True, command=cmd, reply_text=reply, authorized=True)
-
-        if cmd == "/status":
-            reply = (
-                "🛡️ <b>Suraksha System Status:</b>\n"
-                f"• <b>Status:</b> {'ONLINE' if self.is_configured else 'NOT CONFIGURED'}\n"
-                f"• <b>Alert Threshold:</b> {self.settings.telegram_alert_threshold}\n"
-                f"• <b>Alerts Sent:</b> {self._total_alerts_sent}\n"
-                f"• <b>Muted:</b> {'YES' if self._alerts_muted else 'NO'}\n"
-                f"• <b>Active Incident Tracking:</b> {len(self._alerted_incidents)} calls"
-            )
-            return TelegramCommandResponse(handled=True, command=cmd, reply_text=reply, authorized=True)
-
-        if cmd == "/mute":
-            self._alerts_muted = True
-            return TelegramCommandResponse(
-                handled=True,
-                command=cmd,
-                reply_text="🔇 Suraksha Telegram alerts have been muted.",
-                authorized=True,
-            )
-
-        if cmd == "/unmute":
-            self._alerts_muted = False
-            return TelegramCommandResponse(
-                handled=True,
-                command=cmd,
-                reply_text="🔔 Suraksha Telegram alerts are now active.",
-                authorized=True,
-            )
-
-        if cmd == "/latest":
-            if not self._alerted_incidents:
-                reply = "ℹ️ No scam incidents recorded in current session."
-            else:
-                last_call_id, details = list(self._alerted_incidents.items())[-1]
+            if cmd in ("/start", "/help"):
                 reply = (
-                    f"🛡️ <b>Latest Alert Record:</b>\n"
-                    f"• <b>Call ID:</b> <code>{last_call_id}</code>\n"
-                    f"• <b>Risk Level:</b> {details.get('risk_level')}\n"
-                    f"• <b>Risk Score:</b> {details.get('risk_score')}/100"
+                    "🛡️ <b>Suraksha AI Scam Shield Bot</b>\n\n"
+                    "<b>Supported Commands:</b>\n"
+                    "• <code>/status</code> - View backend STT, AI detector, and alert status\n"
+                    "• <code>/latest</code> - View latest call risk assessment\n"
+                    "• <code>/mute</code> - Temporarily mute Telegram notifications\n"
+                    "• <code>/unmute</code> - Re-enable Telegram notifications\n"
+                    "• <code>/help</code> - Show this guidance message\n\n"
+                    "<i>⚠️ Note on Call Control: Suraksha alerts cannot mute or disconnect cellular GSM carrier calls. "
+                    "Always hang up via your phone dialer if a scam is suspected.</i>"
                 )
-            return TelegramCommandResponse(handled=True, command=cmd, reply_text=reply, authorized=True)
+                return TelegramCommandResponse(handled=True, command=cmd, reply_text=reply, authorized=True)
 
+            if cmd == "/status":
+                reply = (
+                    "🛡️ <b>Suraksha System Status:</b>\n"
+                    f"• <b>Status:</b> {'ONLINE' if self.is_configured else 'NOT CONFIGURED'}\n"
+                    f"• <b>Alert Threshold:</b> {self.settings.telegram_alert_threshold}\n"
+                    f"• <b>Alerts Sent:</b> {self._total_alerts_sent}\n"
+                    f"• <b>Muted:</b> {'YES' if self._alerts_muted else 'NO'}\n"
+                    f"• <b>Active Incident Tracking:</b> {len(self._alerted_incidents)} calls"
+                )
+                return TelegramCommandResponse(handled=True, command=cmd, reply_text=reply, authorized=True)
+
+            if cmd == "/mute":
+                self._alerts_muted = True
+                return TelegramCommandResponse(
+                    handled=True,
+                    command=cmd,
+                    reply_text="🔇 Suraksha Telegram alerts have been muted.",
+                    authorized=True,
+                )
+
+            if cmd == "/unmute":
+                self._alerts_muted = False
+                return TelegramCommandResponse(
+                    handled=True,
+                    command=cmd,
+                    reply_text="🔔 Suraksha Telegram alerts are now active.",
+                    authorized=True,
+                )
+
+            if cmd == "/latest":
+                if not self._alerted_incidents:
+                    reply = "ℹ️ No scam incidents recorded in current session."
+                else:
+                    last_call_id, details = list(self._alerted_incidents.items())[-1]
+                    reply = (
+                        f"🛡️ <b>Latest Alert Record:</b>\n"
+                        f"• <b>Call ID:</b> <code>{last_call_id}</code>\n"
+                        f"• <b>Risk Level:</b> {details.get('risk_level')}\n"
+                        f"• <b>Risk Score:</b> {details.get('risk_score')}/100"
+                    )
+                return TelegramCommandResponse(handled=True, command=cmd, reply_text=reply, authorized=True)
+
+            return TelegramCommandResponse(
+                handled=False,
+                command=cmd,
+                reply_text=f"Unknown command '{cmd}'. Send /help for available commands.",
+                authorized=True,
+            )
+
+        # Non-command message: analyze for scam risk!
+        res = self.process_incoming_message(message)
         return TelegramCommandResponse(
-            handled=False,
-            command=cmd,
-            reply_text=f"Unknown command '{cmd}'. Send /help for available commands.",
+            handled=True,
+            command="analyze_scam",
+            reply_text=res.get("reply_text", "Analyzed message."),
             authorized=True,
         )
+
+    def _fetch_updates(self, offset: int, timeout: int = 5) -> List[Dict[str, Any]]:
+        if not self.is_configured:
+            return []
+        try:
+            payload = {"offset": offset, "timeout": timeout, "limit": 10}
+            if self.http_transport is not None:
+                resp = self.http_transport("getUpdates", payload)
+            else:
+                resp = self._dispatch_http_request("getUpdates", payload)
+            return resp.get("result", [])
+        except Exception:
+            return []
+
+    async def start_polling_loop(self) -> None:
+        """Background worker that continuously polls Telegram Bot API for incoming updates."""
+        if not self.is_configured or self._polling_active:
+            return
+        self._polling_active = True
+        logger.info("Telegram Bot long-polling background worker started")
+        import asyncio
+        while self._polling_active:
+            try:
+                updates = await asyncio.to_thread(self._fetch_updates, self._last_update_id + 1, 5)
+                for upd in updates:
+                    uid = upd.get("update_id", 0)
+                    if uid > self._last_update_id:
+                        self._last_update_id = uid
+                    if uid not in self._processed_update_ids:
+                        self._processed_update_ids.add(uid)
+                        if len(self._processed_update_ids) > 1000:
+                            self._processed_update_ids.clear()
+                        self.handle_webhook_update(upd)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.debug("Telegram polling tick: %s", exc)
+                await asyncio.sleep(2.0)
+            await asyncio.sleep(0.5)
+
+    def stop_polling_loop(self) -> None:
+        self._polling_active = False
 
     def get_status(self) -> TelegramStatusResponse:
         """Returns the operational and configuration status of the Telegram service."""

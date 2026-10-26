@@ -75,6 +75,8 @@ class TelegramMessage(BaseModel):
     from_user: Optional[TelegramFromUser] = Field(default=None, alias="from")
     chat: TelegramChat
     text: Optional[str] = None
+    voice: Optional[Dict[str, Any]] = None
+    audio: Optional[Dict[str, Any]] = None
     date: int = 0
 
 

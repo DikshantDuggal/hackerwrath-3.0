@@ -149,8 +149,8 @@ REGEX_ACCOUNT_SUSPENSION = re.compile(
 )
 
 REGEX_REMOTE_ACCESS = re.compile(
-    r"\b(download|install|open|chalao|khol|share screen|screen share)\b.*?\b(anydesk|teamviewer|quicksupport|rustdesk|screen share)\b"
-    r"|\b(anydesk|teamviewer|quicksupport|rustdesk)\b.*?\b(download|install|open|karo|daalo|kar lo)\b",
+    r"\b(download|install|open|chalao|khol|share screen|screen share)\b.*?\b(anydesk|teamviewer|quicksupport|rustdesk|screen share|remote access|remote control|remote support|remote desktop|support tool|support app|unverified app|apk)\b"
+    r"|\b(anydesk|teamviewer|quicksupport|rustdesk|remote access|remote control|remote desktop|screen share)\b.*?\b(download|install|open|karo|daalo|kar lo|app|application|tool|software)\b",
     re.IGNORECASE,
 )
 
@@ -284,6 +284,9 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
             "download anydesk",
             "anydesk app",
             "teamviewer",
+            "remote access application",
+            "remote access app",
+            "install remote access",
             "quicksupport",
             "rustdesk",
             "share your screen",
