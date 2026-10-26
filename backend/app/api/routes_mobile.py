@@ -59,6 +59,47 @@ class DemoCallRequest(BaseModel):
 class DemoCallResponse(BaseModel):
     call_id: str
 
+class MessageAnalysisRequest(BaseModel):
+    text: str
+    source: Optional[str] = "telegram"
+    language_code: Optional[str] = "auto"
+
+
+class MessageAnalysisResponse(BaseModel):
+    id: str
+    timestamp: float
+    original_text: str
+    normalized_text: str
+    detected_language: str
+    detected_script: str
+    risk_score: float
+    risk_level: str
+    headline: str
+    safe_action: str
+    signals: List[str]
+    protective_advice: bool
+    is_conversational: bool
+
+
+class SystemStatusResponse(BaseModel):
+    backend_online: bool = True
+    service: str = "EdgeRunner Guardian"
+    version: str = "1.0.0"
+    telegram_configured: bool = False
+    telegram_status: str = "DISCONNECTED"
+    telegram_bot_username: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
+    stt_working: bool = True
+    stt_model: str = "saaras:v3"
+    rules_engine_working: bool = True
+    icfd_model_working: bool = True
+    contextual_ai_working: bool = True
+    total_messages_analyzed: int = 0
+    active_alerts_count: int = 0
+
+_analyzed_messages: List[Dict[str, Any]] = []
+
+
 
 # In-memory settings storage per user
 _user_settings: Dict[str, SettingsDto] = {}
@@ -211,6 +252,122 @@ async def _run_demo_scenario(call_id: str, scenario: str) -> None:
         logger.warning("Error running demo scenario for call '%s': %s", call_id, exc)
     finally:
         _active_demo_tasks.pop(call_id, None)
+
+
+
+
+@router.get("/system/status", response_model=SystemStatusResponse)
+async def get_system_status() -> SystemStatusResponse:
+    from app.core.config import get_settings
+    from app.services.telegram_service import get_telegram_service
+    from app.detectors.icfd_classifier import get_icfd_classifier
+    settings = get_settings()
+    tg_service = get_telegram_service()
+    tg_status = tg_service.get_status()
+    icfd = get_icfd_classifier()
+    
+    return SystemStatusResponse(
+        backend_online=True,
+        service=settings.app_name,
+        version=settings.app_version,
+        telegram_configured=tg_status.configured,
+        telegram_status=tg_status.status,
+        telegram_bot_username=tg_status.bot_username,
+        telegram_chat_id=settings.telegram_chat_id if tg_status.chat_id_configured else None,
+        stt_working=True,
+        stt_model=settings.sarvam_stt_model,
+        rules_engine_working=True,
+        icfd_model_working=icfd.available,
+        contextual_ai_working=True,
+        total_messages_analyzed=len(_analyzed_messages),
+        active_alerts_count=tg_status.total_alerts_sent,
+    )
+
+
+@router.post("/messages/analyze", response_model=MessageAnalysisResponse)
+async def analyze_message(req: MessageAnalysisRequest) -> MessageAnalysisResponse:
+    from app.api.routes_analysis import get_conversation_manager
+    from app.schemas.analysis import TranscriptAnalysisRequest
+    from app.services.telegram_service import get_telegram_service
+    from app.detectors.sensitive_info_detector import get_sensitive_info_detector
+
+    clean_text = req.text.strip()
+    if not clean_text:
+        from app.core.compat import HTTPException
+        raise HTTPException(status_code=422, detail="Message text must not be empty.")
+
+    msg_id = f"msg_{uuid.uuid4().hex[:8]}"
+    now_ts = time.time()
+    
+    conv_manager = get_conversation_manager()
+    analysis_req = TranscriptAnalysisRequest(
+        transcript=clean_text,
+        language_code=req.language_code or "auto",
+        call_id=msg_id,
+    )
+    assessment = conv_manager.analyze_standalone_transcript(analysis_req)
+    is_protective = get_sensitive_info_detector().detect(clean_text).is_protective_warning
+
+    if assessment.risk_level in ("HIGH", "CRITICAL") and not is_protective:
+        try:
+            tg_svc = get_telegram_service()
+            if tg_svc.is_configured and tg_svc.is_enabled:
+                tg_svc.send_risk_alert(assessment, msg_id)
+        except Exception as exc:
+            logger.warning("Telegram alert dispatch error: %s", exc)
+
+    from app.services.language_detector import get_language_detector
+    lang_info = get_language_detector().detect(clean_text)
+
+    resp = MessageAnalysisResponse(
+        id=msg_id,
+        timestamp=now_ts,
+        original_text=clean_text,
+        normalized_text=assessment.normalized_text or lang_info.normalized_text,
+        detected_language=assessment.detected_language or lang_info.detected_language,
+        detected_script=assessment.detected_script or lang_info.detected_script,
+        risk_score=assessment.risk_score,
+        risk_level=assessment.risk_level,
+        headline=assessment.caption,
+        safe_action=assessment.recommended_action,
+        signals=assessment.reasons if assessment.reasons else [e.category for e in assessment.evidence],
+        protective_advice=is_protective,
+        is_conversational=lang_info.is_conversational,
+    )
+
+    _analyzed_messages.insert(0, resp.model_dump())
+    if len(_analyzed_messages) > 50:
+        _analyzed_messages.pop()
+
+    try:
+        broadcaster = get_broadcaster()
+        asyncio.create_task(broadcaster.broadcast({
+            "v": 1,
+            "type": "message_analyzed",
+            "message_id": msg_id,
+            "risk_level": assessment.risk_level,
+            "risk_score": assessment.risk_score,
+            "detected_language": assessment.detected_language,
+            "detected_script": assessment.detected_script,
+            "headline": assessment.caption,
+            "safe_action": assessment.recommended_action,
+            "protective_advice": is_protective,
+        }))
+    except Exception:
+        pass
+
+    return resp
+
+
+@router.get("/messages/history", response_model=List[MessageAnalysisResponse])
+async def get_message_history() -> List[MessageAnalysisResponse]:
+    return [MessageAnalysisResponse(**m) for m in _analyzed_messages]
+
+
+@router.delete("/messages/history")
+async def clear_message_history() -> Dict[str, Any]:
+    _analyzed_messages.clear()
+    return {"ok": True, "cleared": True}
 
 
 @router.post("/demo/calls", response_model=DemoCallResponse)
