@@ -9,7 +9,9 @@
 param(
     [string]$AvdName = "edgerunner_playstore",
     [switch]$NoGui = $false,
-    [switch]$SkipInstall = $false
+    [switch]$SkipInstall = $false,
+    [switch]$Restart = $false,
+    [switch]$Force = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,13 +52,20 @@ if ($avdList -notcontains $AvdName) {
     }
 }
 
-# 3. Check if an emulator is already running
+# 3. Handle Restart or Force
+if ($Restart -or $Force) {
+    Write-Host "Restart requested. Terminating existing emulator..." -ForegroundColor Yellow
+    Get-Process -Name "*emulator*", "*qemu*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+}
+
+# 4. Check if an emulator is already running
 $attachedDevices = & $AdbExe devices | Select-String "emulator-"
 if ($attachedDevices) {
     Write-Host "[3/5] Active emulator instance detected. Using running emulator." -ForegroundColor Green
 } else {
     Write-Host "[3/5] Starting Android Emulator ($AvdName)..." -ForegroundColor Green
-    $emuArgs = @("-avd", $AvdName, "-no-snapshot-load", "-netdelay", "none", "-netspeed", "full")
+    $emuArgs = @("-avd", $AvdName, "-netdelay", "none", "-netspeed", "full")
     if ($NoGui) {
         $emuArgs += "-no-window"
     }
@@ -87,11 +96,11 @@ if ($attachedDevices) {
     }
 }
 
-# 4. Configure ADB Reverse Port Forwarding
+# 5. Configure ADB Reverse Port Forwarding
 Write-Host "[4/5] Configuring ADB Port Mapping (8000 to 8000)..." -ForegroundColor Green
 & $AdbExe reverse tcp:8000 tcp:8000
 
-# 5. Install and Launch APK
+# 6. Install and Launch APK
 if (-not $SkipInstall) {
     $ApkPath = "D:\edgerunner guardian frontend\android\app\build\outputs\apk\debug\app-debug.apk"
     if (Test-Path $ApkPath) {
