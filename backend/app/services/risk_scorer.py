@@ -29,6 +29,7 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List, Optional
 from app.core.config import Settings, get_settings
+from app.services.language_detector import get_language_detector
 from app.detectors.sensitive_info_detector import (
     SensitiveInfoDetectionResult,
     SensitiveInfoDetector,
@@ -105,6 +106,7 @@ class RiskScorer:
                 sample_text = " ".join(contextual_result.supporting_excerpts)
         words = sample_text.split()
         word_count = len(words)
+        lang_info = get_language_detector().detect(raw_transcript or sample_text)
 
         # Run or use dedicated SensitiveInfoDetector
         sens_res = sensitive_detection
@@ -272,6 +274,10 @@ class RiskScorer:
                 deepfake_analysis=deepfake_result,
                 alert=alert,
                 synchronization_status=sync_status or {"working": True},
+                original_text=raw_transcript or sample_text,
+                normalized_text=lang_info.normalized_text,
+                detected_language=lang_info.detected_language,
+                detected_script=lang_info.detected_script,
             )
 
         # ---------------------------------------------------------------------
@@ -281,7 +287,7 @@ class RiskScorer:
         is_isolated_token = (0 < word_count < 3) and not (
             rule_result.rule_score >= 60.0 and len(rule_result.triggered_indicators) >= 2
         )
-        if is_isolated_token and not is_protective:
+        if is_isolated_token and not is_protective and not lang_info.is_conversational:
             limitations.append(
                 "Transcript is too brief or contains only isolated tokens without conversational context to determine intent."
             )
@@ -311,6 +317,10 @@ class RiskScorer:
                 deepfake_analysis=deepfake_result,
                 alert=alert,
                 synchronization_status=sync_status or {"working": True},
+                original_text=raw_transcript or sample_text,
+                normalized_text=lang_info.normalized_text,
+                detected_language=lang_info.detected_language,
+                detected_script=lang_info.detected_script,
             )
 
         # ---------------------------------------------------------------------
@@ -390,6 +400,10 @@ class RiskScorer:
                 deepfake_analysis=deepfake_result,
                 alert=alert,
                 synchronization_status=sync_status or {"working": True},
+                original_text=raw_transcript or sample_text,
+                normalized_text=lang_info.normalized_text,
+                detected_language=lang_info.detected_language,
+                detected_script=lang_info.detected_script,
             )
 
         # ---------------------------------------------------------------------
@@ -430,6 +444,10 @@ class RiskScorer:
                 deepfake_analysis=deepfake_result,
                 alert=alert,
                 synchronization_status=sync_status or {"working": True},
+                original_text=raw_transcript or sample_text,
+                normalized_text=lang_info.normalized_text,
+                detected_language=lang_info.detected_language,
+                detected_script=lang_info.detected_script,
             )
 
         # ---------------------------------------------------------------------
@@ -440,6 +458,7 @@ class RiskScorer:
             and not rule_result.triggered_indicators
             and not rule_result.suppressed_protective_matches
             and not sens_res.has_sensitive_mention
+            and not lang_info.is_conversational
         ):
             reasons.append("Available transcript evidence is too brief or ambiguous to assess caller intent.")
             limitations.append("Insufficient conversational speech captured in this segment.")
@@ -466,6 +485,10 @@ class RiskScorer:
                 deepfake_analysis=deepfake_result,
                 alert=alert,
                 synchronization_status=sync_status or {"working": True},
+                original_text=raw_transcript or sample_text,
+                normalized_text=lang_info.normalized_text,
+                detected_language=lang_info.detected_language,
+                detected_script=lang_info.detected_script,
             )
 
 
@@ -636,4 +659,8 @@ class RiskScorer:
             deepfake_analysis=deepfake_result,
             alert=alert,
             synchronization_status=sync_status or {"working": True},
+                original_text=raw_transcript or sample_text,
+                normalized_text=lang_info.normalized_text,
+                detected_language=lang_info.detected_language,
+                detected_script=lang_info.detected_script,
         )

@@ -19,6 +19,7 @@ from app.schemas.analysis import (
     ContextualAnalysisOutput,
 )
 from app.detectors.sensitive_info_detector import get_sensitive_info_detector
+from app.services.language_detector import get_language_detector
 from app.services.rules_engine import (
     REGEX_OTP_SOLICITATION,
     REGEX_URGENT_PAYMENT,
@@ -254,7 +255,16 @@ class ContextualAnalyzer:
                     "ओटीपी मत बताना",
                     "कभी भी ओटीपी साझा न करें",
                     "ਓਟੀਪੀ ਨਾ ਦੱਸੋ",
+                    "ਓਟੀਪੀ ਨਾ ਦਿਓ",
+                    "ਓਟੀਪੀ ਕਿਸੇ ਨੂੰ ਨਾ",
+                    "ਕਿਸੇ ਨੂੰ ਆਪਣਾ ਓਟੀਪੀ ਨਾ ਦੱਸੋ",
                     "ਸ਼ੇਅਰ ਨਾ ਕਰੋ",
+                    "otp kisi ko mat dena",
+                    "apna otp kisi ko mat dena",
+                    "kisi ko mat dena",
+                    "kise nu na dasso",
+                    "kise nu na daso",
+                    "kise nu na deo",
                 )
             )
         ) and "ab otp batao" not in norm and "tell me the code" not in norm
@@ -308,10 +318,16 @@ class ContextualAnalyzer:
                         "otp bhej do",
                         "mainu dasso",
                         "otp dasso",
+                        "otp daso",
+                        "apna otp daso",
+                        "apna otp dasso",
+                        "mainu otp daso",
                         "code dasso",
+                        "code daso",
                         "otp dass",
                         "code dass",
                         "pin dasso",
+                        "pin daso",
                         "upi pin daal",
                         "pin daalo",
                         "pin daal do",
@@ -338,6 +354,8 @@ class ContextualAnalyzer:
                         "tell me your sensitive",
                         "provide your sensitive",
                         "ओटीपी बताओ",
+                        "ओटीपी बताएं",
+                        "ओटीपी बताइए",
                         "पिन डालो",
                         "संवेदनशील जानकारी",
                         "बैंक विवरण",
@@ -561,7 +579,11 @@ class ContextualAnalyzer:
             caption = "Suspicious authority claim, urgency, or payment setup detected"
         else:
             intent_cls = "LEGITIMATE_INQUIRY"
-            caption = "Normal conversational inquiry with no credential or coercive payment demands"
+            lang_check = get_language_detector().detect(current_text)
+            if lang_check.is_conversational:
+                caption = f"Conversational greeting or inquiry in {lang_check.language_category}"
+            else:
+                caption = "Normal conversational inquiry with no credential or coercive payment demands"
 
         return ContextualAnalysisOutput(
             caller_identity_claim=caller_identity,

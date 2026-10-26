@@ -51,7 +51,11 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     # Hindi protective advice (Romanized & Devanagari)
     ("kabhi bhi kisi ko otp mat batana", "Hindi protective advice against sharing OTP"),
     ("kisi ko otp mat batana", "Hindi protective advice against sharing OTP"),
+    ("otp kisi ko mat dena", "Hindi protective advice against sharing OTP"),
+    ("apna otp kisi ko mat dena", "Hindi protective advice against sharing OTP"),
+    ("kisi ko mat dena", "Protective advice against giving credentials"),
     ("otp mat batana", "Hindi protective advice against sharing OTP"),
+    ("otp mat dena", "Hindi protective advice against sharing OTP"),
     ("pin mat batana", "Hindi protective advice against sharing PIN"),
     ("kisi ke saath otp share na karein", "Hindi protective advice"),
     ("kisi ke saath share mat karna", "Hindi protective advice against sharing"),
@@ -79,8 +83,21 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
     ("किसी लिंक पर क्लिक न करें", "Hindi protective advice in Devanagari"),
     # Punjabi protective advice (Romanized & Gurmukhi)
     ("kise nu otp na dasso", "Punjabi protective advice against sharing OTP"),
+    ("kise nu otp na daso", "Punjabi protective advice against sharing OTP"),
+    ("kise nu na dasso", "Punjabi protective advice against sharing"),
+    ("kise nu na daso", "Punjabi protective advice against sharing"),
+    ("kise nu na deo", "Punjabi protective advice against sharing"),
+    ("kise nu vi apna otp na dasso", "Punjabi protective advice against sharing OTP"),
+    ("kise nu vi apna otp na daso", "Punjabi protective advice against sharing OTP"),
+    ("apna otp kise nu na dasso", "Punjabi protective advice against sharing OTP"),
+    ("apna otp kise nu na daso", "Punjabi protective advice against sharing OTP"),
     ("otp na dasso", "Punjabi protective advice against sharing OTP"),
+    ("otp na daso", "Punjabi protective advice against sharing OTP"),
+    ("otp na deo", "Punjabi protective advice against sharing OTP"),
     ("ਓਟੀਪੀ ਨਾ ਦੱਸੋ", "Punjabi protective advice in Gurmukhi"),
+    ("ਓਟੀਪੀ ਨਾ ਦਿਓ", "Punjabi protective advice in Gurmukhi"),
+    ("ਓਟੀਪੀ ਕਿਸੇ ਨੂੰ ਨਾ ਦਿਓ", "Punjabi protective advice in Gurmukhi"),
+    ("ਕਿਸੇ ਨੂੰ ਆਪਣਾ ਓਟੀਪੀ ਨਾ ਦੱਸੋ", "Punjabi protective advice in Gurmukhi"),
     ("ਕਦੇ ਵੀ ਓਟੀਪੀ ਸਾਂਝਾ ਨਾ ਕਰੋ", "Punjabi protective advice in Gurmukhi"),
     # Legitimate buyer asking seller for seller's QR or UPI ID so buyer can pay seller
     ("send me your qr", "Legitimate payer asking for payee's QR code to send payment"),
@@ -115,17 +132,17 @@ PROTECTIVE_OR_LEGITIMATE_PATTERNS: Tuple[Tuple[str, str], ...] = (
 
 
 REGEX_OTP_SOLICITATION = re.compile(
-    r"\b(what is|whats|batao|bata|dasso|das|share|tell|give|enter|send|provide|input|type|confirm|verify|daalo|daal|bhejo|bhej|likho|bolo|read out|read(?:\s+\w+)?\s+out|read|boliye|bataiye|need|asking|asking for)\b.*?\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|auth code|authentication code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials|login credentials|confidential info|confidential details)\b"
-    r"|\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|auth code|authentication code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials)\b.*?\b(batao|bata|dasso|das|share|tell|give|enter|send|provide|read out|read(?:\s+\w+)?\s+out|read|daalo|daal|bhejo|bhej|likho|bolo|chahiye|de do|bata do|dass do|verify|confirm|karo|bataiye|needed|required)\b"
+    r"\b(what is|whats|batao|bata|dasso|daso|das|dass|share|tell|give|enter|send|provide|input|type|confirm|verify|daalo|daal|bhejo|bhej|likho|bolo|read out|read(?:\s+\w+)?\s+out|read|boliye|bataiye|deo|diyo|devo|paao|need|asking|asking for)\b.*?\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|auth code|authentication code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials|login credentials|confidential info|confidential details)\b"
+    r"|\b(otp|pin|upi pin|password|passcode|cvv|code|verification code|auth code|authentication code|sensitive info|sensitive information|sensitive data|sensitive details|bank details|banking details|account details|card details|credentials)\b.*?\b(batao|bata|dasso|daso|das|dass|share|tell|give|enter|send|provide|read out|read(?:\s+\w+)?\s+out|read|daalo|daal|bhejo|bhej|likho|bolo|chahiye|chahida|chahidi|de do|bata do|dass do|das do|deo|diyo|devo|paao|verify|confirm|karo|bataiye|needed|required)\b"
     r"|\b(?:asking|demanding|requesting|soliciting)\s+(?:for\s+)?sensitive\s+(?:info|information|details|data|credentials)\b"
-    r"|(?:ओटीपी|पिन|पासवर्ड|सीवीवी|संवेदनशील\s+जानकारी|बैंक\s+विवरण).*(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर)|(?:बताओ|बताइए|डालो|दीजिए|भेजो|शेयर).*(?:ओटीपी|पिन|पासवर्ड|सीवीवी|संवेदनशील\s+जानकारी|बैंक\s+विवरण)"
-    r"|(?:ਓਟੀਪੀ|ਪਿੰਨ).*(?:ਦੱਸੋ|ਦੱਸ|ਪਾਓ|ਭੇਜੋ)|(?:ਦੱਸੋ|ਦੱਸ|ਪਾਓ|ਭੇਜੋ).*(?:ਓਟੀਪੀ|ਪਿੰਨ)",
+    r"|(?:ओटीपी|पिन|पासवर्ड|सीवीवी|संवेदनशील\s+जानकारी|बैंक\s+विवरण).*(?:बताओ|बताइए|बताएं|बताएँ|डालो|डालें|दीजिए|दो|दें|भेजो|भेजें|शेयर)|(?:बताओ|बताइए|बताएं|बताएँ|डालो|डालें|दीजिए|दो|दें|भेजो|भेजें|शेयर).*(?:ओटीपी|पिन|पासवर्ड|सीवीवी|संवेदनशील\s+जानकारी|बैंक\s+विवरण)"
+    r"|(?:ਓਟੀਪੀ|ਪਿੰਨ).*(?:ਦੱਸੋ|ਦੱਸ|ਦਿਓ|ਦੇਵੋ|ਪਾਓ|ਭੇਜੋ|ਸਾਂਝਾ)|(?:ਦੱਸੋ|ਦੱਸ|ਦਿਓ|ਦੇਵੋ|ਪਾਓ|ਭੇਜੋ|ਸਾਂਝਾ).*(?:ਓਟੀਪੀ|ਪਿੰਨ)",
     re.IGNORECASE,
 )
 
 REGEX_ACCOUNT_SUSPENSION = re.compile(
-    r"\b(account|khata|sim|sim card|card|bank account|kyc|electricity|debit card|service|connection)\b.*?\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band|expired|disconnect|disconnected)\b"
-    r"|\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band)\b.*?\b(account|khata|sim|card|kyc|service|connection)\b"
+    r"\b(account|khata|khate|sim|sim card|card|bank account|kyc|electricity|debit card|service|connection|tuhada account)\b.*?\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band|expired|disconnect|disconnected)\b"
+    r"|\b(block|blocked|suspend|suspended|freeze|frozen|deactivate|band)\b.*?\b(account|khata|khate|sim|card|kyc|service|connection)\b"
     r"|(?:खाता|अकाउंट|सिम|केवाईसी).*(?:बंद|ब्लॉक|सस्पेंड|फ्रीज)|(?:बंद|ब्लॉक|सस्पेंड|फ्रीज).*(?:खाता|अकाउंट|सिम|केवाईसी)"
     r"|(?:ਖਾਤਾ|ਅਕਾਊਂਟ|ਸਿਮ).*(?:ਬੰਦ|ਬਲਾਕ)|(?:ਬੰਦ|ਬਲਾਕ).*(?:ਖਾਤਾ|ਅਕਾਊਂਟ|ਸਿਮ)",
     re.IGNORECASE,
@@ -198,6 +215,10 @@ RULE_DEFINITIONS: Tuple[RulePatternDef, ...] = (
             "pin daalo",
             "pin daal do",
             "otp dasso",
+            "otp daso",
+            "apna otp daso",
+            "apna otp dasso",
+            "mainu otp daso",
             "mainu dasso",
             "tuhade phone te otp aaya",
             "asking sensitive info",

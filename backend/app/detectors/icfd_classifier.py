@@ -90,25 +90,11 @@ class IcfdClassifier:
             self.available = False
 
     def detect_language(self, text: str) -> str:
-        """Classifies text into Devanagari Hindi, Hinglish, or English."""
+        """Classifies text using the script-aware LanguageDetector."""
         if not text:
             return "unknown"
-        has_devanagari = bool(DEVANAGARI_RE.search(text))
-        words = [w.lower() for w in LATIN_WORDS_RE.findall(text)]
-        if not words:
-            return "hindi_devanagari" if has_devanagari else "unknown"
-        
-        hinglish_count = sum(1 for w in words if w in HINGLISH_MARKERS)
-        ratio = hinglish_count / len(words)
-
-        if has_devanagari and ratio > 0.05:
-            return "hindi_mixed"
-        elif has_devanagari:
-            return "hindi_devanagari"
-        elif ratio >= 0.04 or hinglish_count >= 2:
-            return "hinglish"
-        else:
-            return "english"
+        from app.services.language_detector import get_language_detector
+        return get_language_detector().detect(text).detected_language
 
     def predict(self, transcript: str) -> IcfdClassificationResult:
         """

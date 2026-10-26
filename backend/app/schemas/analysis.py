@@ -157,6 +157,10 @@ class ScamRiskAssessment(BaseModel):
     deepfake_analysis: Optional[DeepfakeAnalysisResult] = None
     alert: Optional[AlertPayload] = None
     synchronization_status: Dict[str, Any] = Field(default_factory=dict)
+    original_text: Optional[str] = Field(default=None, description="Original un-mutated input transcript")
+    normalized_text: Optional[str] = Field(default=None, description="Normalized transcript text")
+    detected_language: Optional[str] = Field(default=None, description="Detected language category")
+    detected_script: Optional[str] = Field(default=None, description="Detected script")
 
 
 class TranscriptAnalysisRequest(BaseModel):

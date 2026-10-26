@@ -65,27 +65,28 @@ REGEX_PROTECTIVE = re.compile(
     r"don'?t\s+(?:share|give|tell|disclose|enter|send)|"
     r"(?:will\s+)?never\s+ask\s+(?:for\s+)?(?:your\s+)?(?:otp|pin|password|code)|"
     r"bank\s+(?:employees?\s+)?never\s+ask|"
-    r"kabhi\s+(?:bhi\s+)?(?:kisi\s+ko\s+)?(?:bhi\s+)?(?:otp|pin|password|code)?\s*mat\s+(?:batana|batao|dena|share|karna)|"
-    r"kisi\s+ko\s+(?:bhi\s+)?(?:otp|pin|password|code)?\s*mat\s+(?:batana|batao|dena|share)|"
-    r"kisi\s+ke\s+(?:saath|sath)\s+(?:bhi\s+)?(?:otp|pin|password|code)?\s*(?:share\s+)?mat\s+(?:karna|karein|karo|kijiye|share)|"
-    r"kisi\s+se\s+(?:bhi\s+)?(?:otp|pin|password|code)?\s*(?:share\s+)?mat\s+(?:karna|karein|karo|kijiye|share)|"
-    r"kisi\s+ko\s+(?:bhi\s+)?(?:otp|pin|password|code)?\s*mat\s+(?:batana|batao|dena|share|karna)|"
+    r"kabhi\s+(?:bhi\s+)?(?:kisi\s+ko\s+|kise?\s+nu\s+)?(?:bhi\s+)?(?:apna\s+)?(?:otp|pin|password|code)?\s*(?:mat|na)\s+(?:batana|batao|dena|do|dasso|daso|deo|devo|share|karna)|"
+    r"kisi\s+ko\s+(?:bhi\s+)?(?:apna\s+)?(?:otp|pin|password|code)?\s*mat\s+(?:batana|batao|dena|do|share|karna)|"
+    r"kisi\s+ke\s+(?:saath|sath)\s+(?:bhi\s+)?(?:apna\s+)?(?:otp|pin|password|code)?\s*(?:share\s+)?mat\s+(?:karna|karein|karo|kijiye|share)|"
+    r"kisi\s+se\s+(?:bhi\s+)?(?:apna\s+)?(?:otp|pin|password|code)?\s*(?:share\s+)?mat\s+(?:karna|karein|karo|kijiye|share)|"
     r"share\s+mat\s+(?:karna|karein|karo|kijiye)|"
     r"share\s+na\s+(?:karein|karna|karo)|"
     r"mat\s+share\s+(?:karna|karo|karein)|"
     r"kabhi\s+(?:bhi\s+)?share\s+mat|"
-    r"(?:otp|pin|password|code)\s+(?:kisi\s+ko\s+|kisi\s+ke\s+(?:saath|sath)\s+)?mat\s+(?:batana|batao|dena|share|karna)|"
-    r"(?:otp|pin)\s+(?:kisi\s+ko\s+)?na\s+(?:dasso|do|dena|batao)|"
-    r"kise?\s+nu\s+(?:bhi\s+)?(?:otp|pin|password)?\s*na\s+(?:dasso|do|share|karna|karo)|"
-    r"kisi\s+naal\s+(?:bhi\s+)?(?:otp|pin|password)?\s*na\s+(?:dasso|do|share|karna|karo)|"
-    r"bank\s+kabhi\s+(?:bhi\s+)?(?:otp|pin|password)\s+nahi\s+maangta|"
+    r"(?:apna\s+)?(?:otp|pin|password|code)\s+(?:kisi\s+ko\s+|kisi\s+ke\s+(?:saath|sath)\s+)?mat\s+(?:batana|batao|dena|do|dijiye|share|karna)|"
+    r"(?:apna\s+)?(?:otp|pin|password|code)\s+(?:kisi\s+ko\s+|kise?\s+nu\s+)?na\s+(?:dasso|daso|deo|devo|diyo|do|dena|batao|share)|"
+    r"kise?\s+nu\s+(?:vi|bhi)?\s*(?:apna\s+)?(?:otp|pin|password|code)?\s*na\s+(?:dasso|daso|deo|devo|diyo|do|dena|share|dasna|dassna|karna|karo)|"
+    r"kisi\s+naal\s+(?:vi|bhi)?\s*(?:apna\s+)?(?:otp|pin|password|code)?\s*na\s+(?:dasso|daso|deo|devo|diyo|do|dena|share|karna|karo)|"
+    r"bank\s+(?:kabhi|kade)\s+(?:bhi|vi)?\s*(?:otp|pin|password)\s+nahi\s+(?:maangta|mangda)|"
     r"warning\s*:\s*never\s+share|"
     r"avoid\s+sharing\s+(?:your\s+)?(?:otp|pin|password)"
     r")\b|"
     r"(?:"
     r"ओटीपी\s+मत\s+बताना|ओटीपी\s+साझा\s+न\s+करें|कभी\s+भी\s+ओटीपी\s+साझा\s+न\s+करें|पिन\s+मत\s+डालें|पासवर्ड\s+मत\s+बताएं|"
-    r"बैंक\s+कभी\s+(?:भी\s+)?ओटीपी\s+नहीं\s+मांगता|किसी\s+को\s+ओटीपी\s+मत\s+दीजिए|शेयर\s+मत\s+करना|साझा\s+मत\s+करें|"
-    r"ਓਟੀਪੀ\s+ਨਾ\s+ਦੱਸੋ|ਕਦੇ\s+ਵੀ\s+ਓਟੀਪੀ\s+ਸਾਂਝਾ\s+ਨਾ\s+ਕਰੋ|ਪਿੰਨ\s+ਨਾ\s+ਦੱਸੋ|ਬੈਂਕ\s+ਕਦੇ\s+ਵੀ\s+ਓਟੀਪੀ\s+ਨਹੀਂ\s+ਮੰਗਦਾ|ਸ਼ੇਅਰ\s+ਨਾ\s+ਕਰੋ"
+    r"बैंक\s+कभी\s+(?:भी\s+)?ओटीपी\s+नहीं\s+मांगता|किसी\s+को\s+(?:भी\s+)?(?:अपना\s+)?ओटीपी\s+मत\s+(?:दीजिए|दो|देना|बताएं|बताओ)|शेयर\s+मत\s+करना|साझा\s+मत\s+करें|"
+    r"किसी\s+को\s+ओटीपी\s+मत\s+देना|ओटीपी\s+किसी\s+को\s+मत\s+देना|ओटीपी\s+मत\s+देना|"
+    r"ਓਟੀਪੀ\s+ਨਾ\s+ਦੱਸੋ|ਓਟੀਪੀ\s+ਨਾ\s+ਦਿਓ|ਓਟੀਪੀ\s+ਕਿਸੇ\s+ਨੂੰ\s+ਨਾ\s+ਦਿਓ|ਕਿਸੇ\s+ਨੂੰ\s+(?:ਵੀ\s+)?(?:ਆਪਣਾ\s+)?ਓਟੀਪੀ\s+ਨਾ\s+(?:ਦੱਸੋ|ਦਿਓ|ਦੇਵੋ|ਸਾਂਝਾ)|"
+    r"ਕਦੇ\s+ਵੀ\s+ਓਟੀਪੀ\s+ਸਾਂਝਾ\s+ਨਾ\s+ਕਰੋ|ਪਿੰਨ\s+ਨਾ\s+ਦੱਸੋ|ਬੈਂਕ\s+ਕਦੇ\s+ਵੀ\s+ਓਟੀਪੀ\s+ਨਹੀਂ\s+ਮੰਗਦਾ|ਸ਼ੇਅਰ\s+ਨਾ\s+ਕਰੋ"
     r")",
     re.IGNORECASE,
 )
@@ -135,17 +136,17 @@ REGEX_SOLICITATION_VERBS = re.compile(
     # English
     r"tell|give|share|enter|send|provide|read(?:\s+\w+)?\s+out|read|type|input|verify|confirm|disclose|"
     r"what\s+is|whats|forward|speak|mention|"
-    # Hindi / Hinglish
-    r"batao|bata|bataiye|bata\s+do|bata\s+de|batao\s+na|dasso|das|dass\s+do|"
-    r"share\s+karo|share\s+karein|de\s+do|de\s+dijiye|dena|daalo|daal\s+do|daaliye|"
-    r"bhejo|bhej\s+do|bhejiye|likho|likh\s+do|bolo|boliye|chahiye|mang\s+raha|"
+    # Hindi / Hinglish / Punjabi
+    r"batao|bata|bataiye|bata\s+do|bata\s+de|batao\s+na|dasso|daso|das|dass|dass\s+do|das\s+do|dassiye|dasiye|"
+    r"share\s+karo|share\s+karein|de\s+do|de\s+dijiye|deo|diyo|devo|dena|daalo|daal\s+do|daaliye|paao|paa\s+do|paa\s+diyo|"
+    r"bhejo|bhej\s+do|bhejiye|likho|likh\s+do|bolo|boliye|chahiye|chahida|chahidi|mang\s+raha|"
     r"verify\s+karo|verify\s+karein|confirm\s+karo|confirm\s+karein|enter\s+karo"
     r")\b|"
     r"(?:"
     # Devanagari
-    r"बताओ|बताइए|बता\s+दो|दीजिए|दो|डालो|डाल\s+दो|डालिए|भेजो|भेजिए|लिखो|बोलो|बोलिए|चाहिए|साझा\s+करो|साझा\s+करें|वेरिफाई\s+करो|"
+    r"बताओ|बताइए|बताएं|बताएँ|बता\s+दो|दीजिए|दो|दें|डालो|डालें|डाल\s+दो|डालिए|भेजो|भेजें|भेजिए|लिखो|बोलो|बोलिए|चाहिए|साझा\s+करो|साझा\s+करें|वेरिफाई\s+करो|"
     # Gurmukhi
-    r"ਦੱਸੋ|ਦੱਸ|ਦੱਸ\s+ਦਿਓ|ਦਿਓ|ਪਾਓ|ਪਾ\s+ਦਿਓ|ਭੇਜੋ|ਸਾਂਝਾ\s+ਕਰੋ"
+    r"ਦੱਸੋ|ਦੱਸ|ਦੱਸ\s+ਦਿਓ|ਦਿਓ|ਦੇਵੋ|ਪਾਓ|ਪਾ\s+ਦਿਓ|ਭੇਜੋ|ਸਾਂਝਾ\s+ਕਰੋ"
     r")",
     re.IGNORECASE,
 )

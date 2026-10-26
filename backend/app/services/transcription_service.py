@@ -16,6 +16,7 @@ from typing import Callable, Dict, Optional
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.schemas.transcription import TimestampedSegment, TranscriptionResponse
+from app.services.language_detector import get_language_detector
 
 logger = get_logger("scam_detector.transcription_service")
 
@@ -131,11 +132,16 @@ class SarvamSaarasProvider(BaseSpeechToTextProvider):
         if b"TRANSCRIPT:" in audio_bytes:
             decoded_text = self._extract_embedded_test_transcript(audio_bytes, language_code)
             est_duration = round(max(1.2, min(60.0, len(audio_bytes) / 32000.0)), 2)
+            lang_info = get_language_detector().detect(decoded_text)
             return TranscriptionResponse(
                 provider=self.provider_name,
                 model=self.settings.sarvam_stt_model,
                 language_code=language_code,
                 transcript=decoded_text,
+                original_text=decoded_text,
+                normalized_text=lang_info.normalized_text,
+                detected_language=lang_info.detected_language,
+                detected_script=lang_info.detected_script,
                 confidence=0.93,
                 duration_seconds=est_duration,
                 segments=[
@@ -233,11 +239,16 @@ class SarvamSaarasProvider(BaseSpeechToTextProvider):
                     confidence=confidence,
                 )
             )
+        lang_info = get_language_detector().detect(transcript)
         return TranscriptionResponse(
             provider=self.provider_name,
             model=self.settings.sarvam_stt_model,
             language_code=lang,
             transcript=transcript,
+            original_text=transcript,
+            normalized_text=lang_info.normalized_text,
+            detected_language=lang_info.detected_language,
+            detected_script=lang_info.detected_script,
             confidence=confidence,
             duration_seconds=duration,
             segments=segments,
