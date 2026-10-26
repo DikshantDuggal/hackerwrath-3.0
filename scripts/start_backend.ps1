@@ -5,12 +5,15 @@
     Configures environment variables to strictly preserve C: drive disk space by routing
     model caches and temporary assets to D:\edgerunner_models and D:\pip_cache.
     Binds uvicorn to 0.0.0.0:8000 so the Android emulator (at 10.0.2.2:8000) can reach it.
+    Automatically detects active running instances and handles port management gracefully.
 #>
 
 param(
     [string]$HostAddress = "0.0.0.0",
     [int]$Port = 8000,
-    [switch]$Reload = $false
+    [switch]$Reload = $false,
+    [switch]$Restart = $false,
+    [switch]$Force = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -56,11 +59,51 @@ if (Test-Path $VenvPython) {
 }
 Write-Host "[2/4] Python Runtime: $PythonExe" -ForegroundColor Green
 
-# 3. Navigate to backend directory
+# 3. Check if port is already in use
+$conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($conn) {
+    $existingPid = $conn.OwningProcess
+    if ($Restart -or $Force) {
+        Write-Host "Restart requested. Terminating existing backend process (PID: $existingPid)..." -ForegroundColor Yellow
+        Stop-Process -Id $existingPid -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+    } else {
+        # Check health of existing process
+        $healthy = $false
+        for ($i = 0; $i -lt 2; $i++) {
+            try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 3 -ErrorAction Stop
+                if ($health.status -eq "ok") {
+                    $healthy = $true
+                    break
+                }
+            } catch {
+                Start-Sleep -Seconds 1
+            }
+        }
+
+        if ($healthy) {
+            Write-Host "[3/4] Active backend instance detected on port $Port (PID: $existingPid)." -ForegroundColor Green
+            Write-Host "      Health Check: OK (Service: $($health.service))" -ForegroundColor Green
+            Write-Host "      Accessible inside Android Emulator at http://10.0.2.2:$Port" -ForegroundColor Yellow
+            Write-Host "      (Use .\scripts\start_backend.ps1 -Restart to force restart)" -ForegroundColor DarkGray
+            Write-Host "==========================================================" -ForegroundColor Cyan
+            Write-Host "   EdgeRunner Guardian Backend is Ready!                  " -ForegroundColor Cyan
+            Write-Host "==========================================================" -ForegroundColor Cyan
+            exit 0
+        } else {
+            Write-Warning "Port $Port is occupied by PID $existingPid, but health check failed. Cleaning up..."
+            Stop-Process -Id $existingPid -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+        }
+    }
+}
+
+# 4. Navigate to backend directory
 $BackendDir = "D:\edgerunner guardian frontend\backend"
 Set-Location $BackendDir
 
-# 4. Launch Uvicorn Server
+# 5. Launch Uvicorn Server
 Write-Host "[3/4] Launching Uvicorn on http://$($HostAddress):$Port..." -ForegroundColor Green
 Write-Host "      (Accessible inside Android Emulator at http://10.0.2.2:$Port)" -ForegroundColor Yellow
 
